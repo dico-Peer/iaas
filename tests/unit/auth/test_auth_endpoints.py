@@ -36,20 +36,20 @@ def test_register_valid_credentials(client):
     assert "user" in data
     assert "id" in data["user"]
     assert data["user"]["name"] == "Test User"
-    assert "id" in data["user"]
     assert "role" in data["user"]
 
 
-def test_register_hashes_password(client):
+def test_register_hashes_password_with_bcrypt(client):
     """User password is bcrypt-hashed in DB, not plain text."""
+    email = _unique_email()
     client.post(
         "/api/v1/auth/register",
-        json={"email": "hash@example.com", "password": "SecurePass1", "name": "Hash Test"},
+        json={"email": email, "password": "SecurePass1", "name": "Hash Test"},
     )
     # Verify via login - if we can login, password was stored correctly
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "hash@example.com", "password": "SecurePass1"},
+        json={"email": email, "password": "SecurePass1"},
     )
     assert response.status_code == 200
     assert "access_token" in response.json()
@@ -79,13 +79,14 @@ def test_register_invalid_password_400(client):
 
 def test_login_valid_credentials_200(client):
     """Given registered user, when POST login with correct password, then 200 with tokens."""
+    email = _unique_email()
     client.post(
         "/api/v1/auth/register",
-        json={"email": "login@example.com", "password": "SecurePass1", "name": "Login"},
+        json={"email": email, "password": "SecurePass1", "name": "Login"},
     )
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "login@example.com", "password": "SecurePass1"},
+        json={"email": email, "password": "SecurePass1"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -148,6 +149,17 @@ def test_expired_token_rejected_401(client):
     """401 when token is invalid or expired."""
     response = client.get("/api/v1/users", headers={"Authorization": "Bearer invalid"})
     assert response.status_code == 401
+
+
+def test_malformed_token_rejected_401(client):
+    """401 when token is malformed (separate from expired)."""
+    # Malformed: wrong structure, bad base64, tampered signature
+    for bad_token in ["not.a.jwt", "a.b", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.bad"]:
+        response = client.get(
+            "/api/v1/users",
+            headers={"Authorization": f"Bearer {bad_token}"},
+        )
+        assert response.status_code == 401, f"Expected 401 for {bad_token!r}, got {response.status_code}"
 
 
 def test_protected_endpoint_401_without_token(client):

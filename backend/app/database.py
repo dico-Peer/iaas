@@ -1,12 +1,11 @@
 """Database connection and session."""
-import os
 from contextlib import contextmanager
 from typing import Optional
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://iaas:iaas@localhost:5432/iaas")
+from app.config import DATABASE_URL
 
 
 @contextmanager

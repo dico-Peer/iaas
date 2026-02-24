@@ -2,15 +2,13 @@
 import hashlib
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, HTTPException
 
 from app.database import get_connection, ensure_default_org
 from app.auth.schemas import RegisterRequest, LoginRequest, RefreshRequest, TokenResponse, UserResponse
 from app.auth.jwt import create_access_token, create_refresh_token, verify_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-security = HTTPBearer(auto_error=False)
 
 
 def _hash_password(password: str) -> str:
@@ -101,16 +99,19 @@ def refresh(req: RefreshRequest):
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token")
+    token_hash = _hash_token(req.refresh_token)
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """SELECT id, org_id, email, name, role FROM users
-                   WHERE id = %s AND deleted_at IS NULL""",
-                (user_id,),
+                """SELECT u.id, u.org_id, u.email, u.name, u.role
+                   FROM refresh_tokens rt
+                   JOIN users u ON u.id = rt.user_id AND u.deleted_at IS NULL
+                   WHERE rt.token_hash = %s AND rt.revoked_at IS NULL AND rt.expires_at > NOW()""",
+                (token_hash,),
             )
             row = cur.fetchone()
         if not row:
-            raise HTTPException(status_code=401, detail="User not found")
+            raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
         org_id = str(row["org_id"])
-        access_token = create_access_token(user_id, org_id, row["role"])
+        access_token = create_access_token(str(row["id"]), org_id, row["role"])
         return TokenResponse(access_token=access_token, refresh_token=req.refresh_token)
