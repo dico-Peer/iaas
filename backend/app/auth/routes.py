@@ -5,7 +5,14 @@ import bcrypt
 from fastapi import APIRouter, HTTPException
 
 from app.database import get_connection, ensure_default_org
-from app.auth.schemas import RegisterRequest, LoginRequest, RefreshRequest, TokenResponse, UserResponse
+from app.auth.schemas import (
+    RegisterRequest,
+    LoginRequest,
+    RefreshRequest,
+    AcceptInviteRequest,
+    TokenResponse,
+    UserResponse,
+)
 from app.auth.jwt import create_access_token, create_refresh_token, verify_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -115,3 +122,51 @@ def refresh(req: RefreshRequest):
         org_id = str(row["org_id"])
         access_token = create_access_token(str(row["id"]), org_id, row["role"])
         return TokenResponse(access_token=access_token, refresh_token=req.refresh_token)
+
+
+@router.post("/accept-invite", response_model=TokenResponse)
+def accept_invite(req: AcceptInviteRequest):
+    """Accept user invitation: set password, activate user, return JWT."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT ui.id, ui.user_id, ui.expires_at
+                   FROM user_invitations ui
+                   WHERE ui.token = %s""",
+                (req.token,),
+            )
+            inv = cur.fetchone()
+        if not inv:
+            raise HTTPException(status_code=401, detail="Invalid invitation token")
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM user_invitations WHERE token = %s AND expires_at < NOW()",
+                (req.token,),
+            )
+            if cur.fetchone():
+                raise HTTPException(status_code=410, detail="Invitation expired")
+        user_id = str(inv["user_id"])
+        password_hash = _hash_password(req.password)
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE users SET password_hash = %s, status = 'active'
+                   WHERE id = %s RETURNING id, org_id, email, name, role""",
+                (password_hash, user_id),
+            )
+            row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=401, detail="User not found")
+        org_id = str(row["org_id"])
+        access_token = create_access_token(user_id, org_id, row["role"])
+        refresh_token = create_refresh_token(user_id)
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+                   VALUES (%s, %s, NOW() + INTERVAL '7 days')""",
+                (user_id, _hash_token(refresh_token)),
+            )
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            user=UserResponse(id=user_id, email=row["email"], name=row["name"], role=row["role"]),
+        )
