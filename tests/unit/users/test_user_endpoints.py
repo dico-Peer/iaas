@@ -153,8 +153,117 @@ def test_list_users_paginated(client, org_admin_token):
     assert len(data["users"]) <= 20
 
 
+def test_change_user_role_creates_audit_log(client, org_admin_token):
+    """Role updated, audit_logs entry created with before/after."""
+    designer_email = _unique_email()
+    client.post(
+        "/api/v1/users/invite",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+        json={"email": designer_email, "role": "designer", "name": "Designer"},
+    )
+    from app.database import get_connection
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ui.token FROM user_invitations ui JOIN users u ON u.id = ui.user_id WHERE u.email = %s",
+                (designer_email,),
+            )
+            row = cur.fetchone()
+    client.post("/api/v1/auth/accept-invite", json={"token": row["token"], "password": "DesignerPass1"})
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE email = %s", (designer_email,))
+            user = cur.fetchone()
+    user_id = str(user["id"])
+    r = client.put(
+        f"/api/v1/users/{user_id}/role",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+        json={"role": "analyst"},
+    )
+    assert r.status_code == 200
+    assert r.json()["role"] == "analyst"
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT action, details_json FROM audit_logs
+                   WHERE resource_type = 'user' AND resource_id = %s ORDER BY created_at DESC LIMIT 1""",
+                (user_id,),
+            )
+            log = cur.fetchone()
+    assert log
+    assert log["action"] == "user_role_changed"
+    assert log["details_json"]["before"] == "designer"
+    assert log["details_json"]["after"] == "analyst"
+
+
+def test_soft_delete_user_sets_deleted_at(client, org_admin_token):
+    """DELETE sets deleted_at, user not physically removed."""
+    designer_email = _unique_email()
+    client.post(
+        "/api/v1/users/invite",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+        json={"email": designer_email, "role": "designer", "name": "To Delete"},
+    )
+    from app.database import get_connection
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ui.token FROM user_invitations ui JOIN users u ON u.id = ui.user_id WHERE u.email = %s",
+                (designer_email,),
+            )
+            row = cur.fetchone()
+    client.post("/api/v1/auth/accept-invite", json={"token": row["token"], "password": "DesignerPass1"})
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE email = %s", (designer_email,))
+            user = cur.fetchone()
+    user_id = str(user["id"])
+    r = client.delete(
+        f"/api/v1/users/{user_id}",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+    )
+    assert r.status_code == 200
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT deleted_at, status FROM users WHERE id = %s", (user_id,))
+            row = cur.fetchone()
+    assert row["deleted_at"] is not None
+    assert row["status"] == "inactive"
+
+
+def test_soft_delete_invalidates_sessions(client, org_admin_token):
+    """All refresh_tokens for user revoked on soft delete."""
+    designer_email = _unique_email()
+    client.post(
+        "/api/v1/users/invite",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+        json={"email": designer_email, "role": "designer", "name": "Session Test"},
+    )
+    from app.database import get_connection
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ui.token FROM user_invitations ui JOIN users u ON u.id = ui.user_id WHERE u.email = %s",
+                (designer_email,),
+            )
+            row = cur.fetchone()
+    accept_r = client.post("/api/v1/auth/accept-invite", json={"token": row["token"], "password": "DesignerPass1"})
+    refresh_token = accept_r.json()["refresh_token"]
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE email = %s", (designer_email,))
+            user = cur.fetchone()
+    user_id = str(user["id"])
+    client.delete(
+        f"/api/v1/users/{user_id}",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+    )
+    r = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert r.status_code == 401
+
+
 def test_non_admin_403_on_user_endpoints(client):
-    """Designer/Analyst/Viewer get 403 on invite/delete/role."""
+    """Designer/Analyst/Viewer get 403 on invite, role change, delete."""
     # Register as designer (we register as org_admin by default - need to invite a designer first)
     email = _unique_email()
     admin_r = client.post(
@@ -186,13 +295,52 @@ def test_non_admin_403_on_user_endpoints(client):
         json={"token": row["token"], "password": "DesignerPass1"},
     )
     designer_token = accept_r.json()["access_token"]
-    # Designer tries to invite - should get 403
+    admin_id = None
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+            admin_id = str(cur.fetchone()["id"])
+    # Designer tries invite, role change, delete - all 403
     r = client.post(
         "/api/v1/users/invite",
         headers={"Authorization": f"Bearer {designer_token}"},
         json={"email": _unique_email(), "role": "analyst", "name": "X"},
     )
     assert r.status_code == 403
+    r = client.put(
+        f"/api/v1/users/{admin_id}/role",
+        headers={"Authorization": f"Bearer {designer_token}"},
+        json={"role": "analyst"},
+    )
+    assert r.status_code == 403
+    r = client.delete(
+        f"/api/v1/users/{admin_id}",
+        headers={"Authorization": f"Bearer {designer_token}"},
+    )
+    assert r.status_code == 403
+
+
+def test_invitation_token_consumed_after_accept(client, org_admin_token):
+    """Token cannot be replayed after successful accept."""
+    email = _unique_email()
+    client.post(
+        "/api/v1/users/invite",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+        json={"email": email, "role": "designer", "name": "Replay Test"},
+    )
+    from app.database import get_connection
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ui.token FROM user_invitations ui JOIN users u ON u.id = ui.user_id WHERE u.email = %s",
+                (email,),
+            )
+            row = cur.fetchone()
+    token = row["token"]
+    r1 = client.post("/api/v1/auth/accept-invite", json={"token": token, "password": "SecurePass1"})
+    assert r1.status_code == 200
+    r2 = client.post("/api/v1/auth/accept-invite", json={"token": token, "password": "OtherPass1"})
+    assert r2.status_code == 401
 
 
 def test_expired_invitation_410(client, org_admin_token):

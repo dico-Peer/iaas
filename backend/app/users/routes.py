@@ -1,11 +1,12 @@
 """Users API routes - protected by JWT."""
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth.dependencies import get_current_user, get_current_org_admin
 from app.database import get_connection
-from app.users.schemas import InviteRequest
+from app.users.schemas import InviteRequest, ChangeRoleRequest
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -97,3 +98,70 @@ def invite_user(
         "status": row["status"],
         "org_id": org_id,
     }
+
+
+@router.put("/{user_id}/role")
+def change_user_role(
+    user_id: str,
+    req: ChangeRoleRequest,
+    current_user: dict = Depends(get_current_org_admin),
+):
+    """Change user role. Org admin only. Creates audit log entry."""
+    if req.role not in ALLOWED_ROLES:
+        raise HTTPException(status_code=400, detail=f"Role must be one of {ALLOWED_ROLES}")
+    org_id = current_user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, role FROM users WHERE id = %s AND org_id = %s AND deleted_at IS NULL",
+                (user_id, org_id),
+            )
+            row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found")
+        old_role = row["role"]
+        if old_role == req.role:
+            return {"id": user_id, "role": req.role}
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET role = %s WHERE id = %s AND org_id = %s",
+                (req.role, user_id, org_id),
+            )
+            cur.execute(
+                """INSERT INTO audit_logs (org_id, user_id, action, resource_type, resource_id, details_json)
+                   VALUES (%s, %s, 'user_role_changed', 'user', %s, %s)""",
+                (org_id, current_user.get("sub"), user_id, json.dumps({"before": old_role, "after": req.role})),
+            )
+    return {"id": user_id, "role": req.role}
+
+
+@router.delete("/{user_id}")
+def soft_delete_user(
+    user_id: str,
+    current_user: dict = Depends(get_current_org_admin),
+):
+    """Soft delete user. Sets deleted_at, revokes all refresh tokens."""
+    org_id = current_user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM users WHERE id = %s AND org_id = %s AND deleted_at IS NULL",
+                (user_id, org_id),
+            )
+            row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found")
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = %s",
+                (user_id,),
+            )
+            cur.execute(
+                "UPDATE users SET deleted_at = NOW(), status = 'inactive' WHERE id = %s",
+                (user_id,),
+            )
+    return {"id": user_id, "deleted": True}

@@ -18,3 +18,7 @@ class UserListResponse(BaseModel):
     status: str
     last_login: Optional[str] = None
     created_at: str
+
+
+class ChangeRoleRequest(BaseModel):
+    role: str

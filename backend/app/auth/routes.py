@@ -1,5 +1,6 @@
 """Auth API routes."""
 import hashlib
+from datetime import datetime, timezone
 
 import bcrypt
 from fastapi import APIRouter, HTTPException
@@ -90,6 +91,7 @@ def login(req: LoginRequest):
                    VALUES (%s, %s, NOW() + INTERVAL '7 days')""",
                 (user_id, _hash_token(refresh_token)),
             )
+            cur.execute("UPDATE users SET last_login = NOW() WHERE id = %s", (user_id,))
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
@@ -138,12 +140,10 @@ def accept_invite(req: AcceptInviteRequest):
             inv = cur.fetchone()
         if not inv:
             raise HTTPException(status_code=401, detail="Invalid invitation token")
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT 1 FROM user_invitations WHERE token = %s AND expires_at < NOW()",
-                (req.token,),
-            )
-            if cur.fetchone():
+        exp = inv["expires_at"]
+        if exp:
+            exp_ts = exp.timestamp() if getattr(exp, "tzinfo", None) else exp.replace(tzinfo=timezone.utc).timestamp()
+            if exp_ts < datetime.now(timezone.utc).timestamp():
                 raise HTTPException(status_code=410, detail="Invitation expired")
         user_id = str(inv["user_id"])
         password_hash = _hash_password(req.password)
@@ -165,6 +165,8 @@ def accept_invite(req: AcceptInviteRequest):
                    VALUES (%s, %s, NOW() + INTERVAL '7 days')""",
                 (user_id, _hash_token(refresh_token)),
             )
+            cur.execute("UPDATE users SET last_login = NOW() WHERE id = %s", (user_id,))
+            cur.execute("DELETE FROM user_invitations WHERE token = %s", (req.token,))
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
