@@ -1,4 +1,4 @@
-.PHONY: test lint type-check build up down install migrate migrate-down
+.PHONY: test lint type-check build up down install migrate migrate-down push
 
 install:
 	cd backend && python3 -m pip install -r requirements.txt
@@ -36,3 +36,11 @@ up:
 
 down:
 	docker compose down
+
+push:
+	@if [ -z "$$(git remote -v)" ]; then \
+		echo "No remote configured. Run: git remote add origin <your-repo-url>"; \
+		exit 1; \
+	fi; \
+	echo "Pushing main..."; git push -u origin main || true; \
+	echo "Pushing current branch..."; git push -u origin $$(git branch --show-current)

@@ -42,3 +42,20 @@ IaaS/
 
 - **US-1.01:** Monorepo Setup & CI/CD Pipeline ✅
 - **US-1.02:** PostgreSQL Database Schema & Migrations ✅
+- **US-1.03:** JWT Auth (register, login, refresh, protected endpoints) ✅
+
+## Publishing (Push & PR)
+
+First-time setup: add your remote and push both branches.
+
+```bash
+# Add remote (replace with your repo URL)
+git remote add origin git@github.com:YOUR_USERNAME/iaas.git
+# or: git remote add origin https://github.com/YOUR_USERNAME/iaas.git
+
+# Push main and feature branch
+git push -u origin main
+git push -u origin feature/us-1.03-jwt-auth
+```
+
+Then create a Pull Request: **base `main`** ← **compare `feature/us-1.03-jwt-auth`**
