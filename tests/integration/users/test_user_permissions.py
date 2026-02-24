@@ -36,11 +36,13 @@ def test_org_isolation_in_user_list(client):
             cur.execute("SELECT org_id FROM users WHERE email = %s", (email_a,))
             org_a_id = str(cur.fetchone()["org_id"])
     # Create org B and add a user in org B (not visible to org A admin)
+    slug_b = f"org-{uuid.uuid4().hex[:8]}"
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO organizations (name, slug, settings_json)
-                   VALUES ('Org B', 'org-b', '{}') RETURNING id""",
+                   VALUES (%s, %s, '{}') RETURNING id""",
+                (f"Org {slug_b}", slug_b),
             )
             org_b_id = str(cur.fetchone()["id"])
             cur.execute(

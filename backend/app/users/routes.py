@@ -10,6 +10,8 @@ from app.users.schemas import InviteRequest, ChangeRoleRequest
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+# Roles assignable via invite/role-change. org_admin excluded for MVP security
+# (prevents privilege escalation via API; org admins created via register or DB).
 ALLOWED_ROLES = ("designer", "analyst", "viewer")
 
 

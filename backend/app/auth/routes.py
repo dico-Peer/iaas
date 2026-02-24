@@ -1,6 +1,5 @@
 """Auth API routes."""
 import hashlib
-from datetime import datetime, timezone
 
 import bcrypt
 from fastapi import APIRouter, HTTPException
@@ -132,19 +131,20 @@ def accept_invite(req: AcceptInviteRequest):
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """SELECT ui.id, ui.user_id, ui.expires_at
-                   FROM user_invitations ui
-                   WHERE ui.token = %s""",
+                """SELECT ui.id, ui.user_id FROM user_invitations ui
+                   WHERE ui.token = %s AND ui.expires_at > NOW()""",
                 (req.token,),
             )
             inv = cur.fetchone()
         if not inv:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM user_invitations WHERE token = %s AND expires_at <= NOW()",
+                    (req.token,),
+                )
+                if cur.fetchone():
+                    raise HTTPException(status_code=410, detail="Invitation expired")
             raise HTTPException(status_code=401, detail="Invalid invitation token")
-        exp = inv["expires_at"]
-        if exp:
-            exp_ts = exp.timestamp() if getattr(exp, "tzinfo", None) else exp.replace(tzinfo=timezone.utc).timestamp()
-            if exp_ts < datetime.now(timezone.utc).timestamp():
-                raise HTTPException(status_code=410, detail="Invitation expired")
         user_id = str(inv["user_id"])
         password_hash = _hash_password(req.password)
         with conn.cursor() as cur:
