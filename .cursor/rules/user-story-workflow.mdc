@@ -1,0 +1,43 @@
+---
+description: User story branch and PR workflow
+alwaysApply: true
+---
+
+# User Story Workflow
+
+## Before Starting a User Story
+
+1. **Create a feature branch** named after the user story:
+   - Format: `feature/<story-id>-<short-name>` (e.g. `feature/us-1.03-jwt-auth`)
+   - Or: `feature/<story-id>` (e.g. `feature/us-1.04`)
+   - Branch from `main` unless the story depends on another feature branch
+
+2. **Switch to the branch** before making any changes
+
+## After Finishing a User Story
+
+1. **Commit all changes** on the feature branch with a descriptive message:
+   - `feat(US-X.XX): <short description>`
+   - Include bullet points for significant changes
+
+2. **Create a Pull Request** for review:
+   - Base: `main`
+   - Compare: feature branch
+   - Add a title and description summarizing the story and changes
+
+3. **Do not merge** until the user has reviewed and approved
+
+## Example
+
+```bash
+# Before starting US-1.04
+git checkout main
+git pull
+git checkout -b feature/us-1.04-organization-crud
+
+# After finishing
+git add .
+git commit -m "feat(US-1.04): Organization CRUD endpoints"
+git push origin feature/us-1.04-organization-crud
+# Then create PR in GitHub/GitLab
+```
