@@ -34,7 +34,7 @@ IaaS/
 
 ## Development
 
-- **Backend:** Python 3.11+, FastAPI, PostgreSQL 16 + pgvector, Redis
+- **Backend:** Python 3.9+, FastAPI, PostgreSQL 16 + pgvector, Redis
 - **Frontend:** Next.js 14, TypeScript, Vitest
 - **Tests:** pytest (backend), Vitest (frontend)
 

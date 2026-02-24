@@ -42,5 +42,5 @@ push:
 		echo "No remote configured. Run: git remote add origin <your-repo-url>"; \
 		exit 1; \
 	fi; \
-	echo "Pushing main..."; git push -u origin main || true; \
+	echo "Pushing main..."; git push -u origin main; \
 	echo "Pushing current branch..."; git push -u origin $$(git branch --show-current)
