@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IaaS - Interviewer As a Service - Complete Wireframes</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+    <style>
+        * {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        .bg-primary-blue { background-color: #2563EB; }
+        .dark-sidebar { background-color: #1E293B; }
+        .chat-bubble-agent { background-color: #F1F5F9; }
+        .chat-bubble-user { background-color: #2563EB; color: white; }
+        .gradient-login { background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%); }
+        .card-shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .rounded-card { border-radius: 8px; }
+        .rounded-lg-container { border-radius: 12px; }
+        .badge-success { background-color: #D1FAE5; color: #065F46; }
+        .badge-warning { background-color: #FEF3C7; color: #92400E; }
+        .badge-gray { background-color: #E5E7EB; color: #374151; }
+        .badge-blue { background-color: #DBEAFE; color: #1E40AF; }
+        .badge-red { background-color: #FEE2E2; color: #991B1B; }
+        .hover-shadow:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: box-shadow 0.3s; }
+        .typing-indicator span { animation: bounce 1.4s infinite; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+        .waveform-bar { animation: wave 0.6s ease-in-out infinite; }
+        @keyframes wave { 0%, 100% { height: 20px; } 50% { height: 50px; } }
+        .transition-width { transition: width 0.3s; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const dummyProjects = [
+            { id: 1, name: 'AI Readiness Assessment 2024', status: 'active', interviews: 12, completion: 85, cost: 245.50, created: '2024-01-15', modified: '2024-02-20' },
+            { id: 2, name: 'Product Requirements Discovery', status: 'testing', interviews: 5, completion: 40, cost: 89.75, created: '2024-02-01', modified: '2024-02-21' },
+            { id: 3, name: 'Customer Satisfaction Study', status: 'draft', interviews: 0, completion: 0, cost: 0, created: '2024-02-20', modified: '2024-02-20' },
+            { id: 4, name: 'HR Competency Framework', status: 'completed', interviews: 25, completion: 100, cost: 512.25, created: '2023-12-01', modified: '2024-02-10' },
+            { id: 5, name: 'Market Research - EU', status: 'archived', interviews: 30, completion: 100, cost: 1245.60, created: '2023-10-15', modified: '2024-01-30' },
+        ];
+
+        const teamMembers = [
+            { id: 1, name: 'Anna Mueller', email: 'anna.mueller@company.de', role: 'Admin', lastActive: '2 minutes ago', status: 'online' },
+            { id: 2, name: 'Klaus Weber', email: 'klaus.weber@company.de', role: 'Designer', lastActive: '1 hour ago', status: 'online' },
+            { id: 3, name: 'Sarah Schmidt', email: 'sarah.schmidt@company.de', role: 'Analyst', lastActive: '5 hours ago', status: 'idle' },
+            { id: 4, name: 'Benjamin Fischer', email: 'benjamin.fischer@company.de', role: 'Viewer', lastActive: '1 day ago', status: 'offline' },
+        ];
+
+        const templates = [
+            { id: 1, name: 'AI Readiness Assessment', category: 'AI Readiness', questions: 8, description: 'Comprehensive evaluation of organizational AI maturity' },
+            { id: 2, name: 'Product Requirements', category: 'Requirements', questions: 12, description: 'Gather detailed feature and capability requirements' },
+            { id: 3, name: 'Customer Feedback', category: 'Custom', questions: 6, description: 'Collect structured customer satisfaction data' },
+            { id: 4, name: 'HR Competency', category: 'HR', questions: 15, description: 'Assess employee skills and development areas' },
+            { id: 5, name: 'Compliance Review', category: 'Compliance', questions: 10, description: 'Ensure regulatory and policy compliance' },
+            { id: 6, name: 'Executive Interview', category: 'Custom', questions: 8, description: 'Structured C-level stakeholder interviews' },
+        ];
+
+        function App() {
+            const [currentPage, setCurrentPage] = useState('login');
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [currentUser, setCurrentUser] = useState(null);
+            const [selectedProject, setSelectedProject] = useState(null);
+            const [projectDetailTab, setProjectDetailTab] = useState('overview');
+            const [sidebarOpen, setSidebarOpen] = useState(true);
+            const [wizardStep, setWizardStep] = useState(1);
+            const [intervieweeFlow, setIntervieweeFlow] = useState(null);
+            const [language, setLanguage] = useState('EN');
+            const [settingsTab, setSettingsTab] = useState('profile');
+
+            const handleLogin = (email) => {
+                setCurrentUser({ name: email.split('@')[0], email });
+                setIsLoggedIn(true);
+                setCurrentPage('dashboard');
+            };
+
+            const handleLogout = () => {
+                setIsLoggedIn(false);
+                setCurrentUser(null);
+                setCurrentPage('login');
+            };
+
+            const handleProjectClick = (project) => {
+                setSelectedProject(project);
+                setCurrentPage('projectDetail');
+                setProjectDetailTab('overview');
+            };
+
+            const handlePreviewAsInterviewee = () => {
+                setIntervieweeFlow({ step: 'landing' });
+                setCurrentPage('intervieweeFlow');
+            };
+
+            if (currentPage === 'login') {
+                return <LoginPage onLogin={handleLogin} language={language} setLanguage={setLanguage} />;
+            }
+
+            if (currentPage === 'intervieweeFlow') {
+                return <IntervieweeFlow flow={intervieweeFlow} setFlow={setIntervieweeFlow} onBack={() => { setCurrentPage('dashboard'); setIntervieweeFlow(null); }} />;
+            }
+
+            return (
+                <div className="flex h-screen bg-gray-50">
+                    <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} currentPage={currentPage} onNavigate={setCurrentPage} onLogout={handleLogout} userName={currentUser?.name} />
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <TopBar userName={currentUser?.name} onPreviewInterviewee={handlePreviewAsInterviewee} />
+                        <div className="flex-1 overflow-auto">
+                            {currentPage === 'dashboard' && <Dashboard onNavigate={setCurrentPage} onProjectClick={handleProjectClick} />}
+                            {currentPage === 'projects' && <ProjectsList onNavigate={setCurrentPage} onProjectClick={handleProjectClick} />}
+                            {currentPage === 'newProject' && <NewProjectWizard step={wizardStep} setStep={setWizardStep} onNavigate={setCurrentPage} />}
+                            {currentPage === 'projectDetail' && selectedProject && <ProjectDetail project={selectedProject} tab={projectDetailTab} setTab={setProjectDetailTab} />}
+                            {currentPage === 'team' && <TeamManagement />}
+                            {currentPage === 'templates' && <TemplatesLibrary />}
+                            {currentPage === 'settings' && <SettingsPage settingsTab={settingsTab} setSettingsTab={setSettingsTab} userName={currentUser?.name} />}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function LoginPage({ onLogin, language, setLanguage }) {
+            const [email, setEmail] = useState('');
+
+            return (
+                <div className="w-full h-screen gradient-login flex items-center justify-center p-4">
+                    <div className="absolute top-6 right-6">
+                        <select value={language} onChange={(e) => setLanguage(e.target.value)} className="px-4 py-2 rounded-card bg-white text-gray-800 font-medium">
+                            <option value="EN">English</option>
+                            <option value="DE">Deutsch</option>
+                        </select>
+                    </div>
+                    <div className="w-full max-w-md">
+                        <div className="bg-white rounded-lg-container p-8 card-shadow">
+                            <div className="text-center mb-8">
+                                <h1 className="text-3xl font-bold text-gray-900">IaaS</h1>
+                                <p className="text-gray-600 mt-2">Interviewer As a Service</p>
+                            </div>
+                            <form onSubmit={(e) => { e.preventDefault(); if (email) onLogin(email); }}>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                </div>
+                                <button type="submit" className="w-full bg-primary-blue text-white py-2 rounded-card font-medium hover:bg-blue-700 transition mb-4">Sign In</button>
+                            </form>
+                            <div className="relative mb-6">
+                                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div>
+                                <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or</span></div>
+                            </div>
+                            <button className="w-full border-2 border-gray-300 text-gray-700 py-2 rounded-card font-medium hover:bg-gray-50 transition">Sign in with SSO</button>
+                            <p className="text-center text-sm text-gray-600 mt-6">Demo: any email</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function Sidebar({ isOpen, onToggle, currentPage, onNavigate, onLogout, userName }) {
+            const items = [
+                { label: 'Dashboard', icon: '📊', page: 'dashboard' },
+                { label: 'Projects', icon: '📋', page: 'projects' },
+                { label: 'Templates', icon: '📑', page: 'templates' },
+                { label: 'Team', icon: '👥', page: 'team' },
+                { label: 'Settings', icon: '⚙️', page: 'settings' },
+            ];
+
+            return (
+                <div className={`${isOpen ? 'w-64' : 'w-20'} dark-sidebar text-white flex flex-col transition-width duration-300 border-r border-gray-700`}>
+                    <div className="p-4 flex items-center justify-between">
+                        {isOpen && <h2 className="text-xl font-bold">IaaS</h2>}
+                        <button onClick={onToggle} className="hover:bg-gray-700 p-2 rounded-card">{isOpen ? '◀' : '▶'}</button>
+                    </div>
+                    <nav className="flex-1 px-2 py-4 space-y-2">
+                        {items.map((item) => (
+                            <button key={item.page} onClick={() => onNavigate(item.page)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-card transition ${currentPage === item.page ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>
+                                <span className="text-lg">{item.icon}</span>
+                                {isOpen && <span className="text-sm font-medium">{item.label}</span>}
+                            </button>
+                        ))}
+                    </nav>
+                    <div className="p-4 border-t border-gray-700">
+                        {isOpen && <p className="text-xs text-gray-400 mb-3">{userName}</p>}
+                        <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 rounded-card hover:bg-gray-700 transition text-sm">
+                            <span>🚪</span>
+                            {isOpen && <span>Logout</span>}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function TopBar({ userName, onPreviewInterviewee }) {
+            return (
+                <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between card-shadow">
+                    <div>
+                        <p className="text-xs text-gray-500">Organization</p>
+                        <h1 className="text-lg font-semibold text-gray-900">TechCorp GmbH</h1>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <button onClick={onPreviewInterviewee} className="px-4 py-2 text-sm border border-gray-300 rounded-card hover:bg-gray-50 transition font-medium">👁 Preview Interviewee</button>
+                        <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">{userName?.charAt(0).toUpperCase()}</div>
+                        <div>
+                            <p className="text-sm font-medium text-gray-900">{userName}</p>
+                            <p className="text-xs text-gray-500">TechCorp GmbH</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function Dashboard({ onNavigate, onProjectClick }) {
+            const stats = [
+                { label: 'Active Projects', value: 3, icon: '📊' },
+                { label: 'Total Interviews', value: 42, icon: '🎤' },
+                { label: 'Completion Rate', value: '87%', icon: '✅' },
+                { label: 'Active Now', value: 2, icon: '🟢' },
+            ];
+
+            return (
+                <div className="p-8">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back! 👋</h1>
+                        <p className="text-gray-600">Here's what's happening with your interviews.</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                        {stats.map((stat, i) => (
+                            <div key={i} className="bg-white rounded-card p-6 card-shadow">
+                                <p className="text-gray-600 text-sm font-medium mb-2">{stat.label}</p>
+                                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                                <p className="text-2xl text-gray-400 mt-2">{stat.icon}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-3 gap-8">
+                        <div className="col-span-2">
+                            <div className="bg-white rounded-card p-6 card-shadow mb-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-gray-900">Recent Projects</h2>
+                                    <button onClick={() => onNavigate('projects')} className="text-blue-600 text-sm font-medium hover:underline">View All →</button>
+                                </div>
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-gray-200">
+                                            <th className="text-left py-3 px-4 font-medium text-gray-600">Name</th>
+                                            <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                                            <th className="text-left py-3 px-4 font-medium text-gray-600">Interviews</th>
+                                            <th className="text-left py-3 px-4 font-medium text-gray-600">Completion</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {dummyProjects.slice(0, 3).map((project) => (
+                                            <tr key={project.id} onClick={() => onProjectClick(project)} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer">
+                                                <td className="py-3 px-4">{project.name}</td>
+                                                <td className="py-3 px-4"><StatusBadge status={project.status} /></td>
+                                                <td className="py-3 px-4">{project.interviews}</td>
+                                                <td className="py-3 px-4"><div className="flex items-center gap-2"><div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-green-500" style={{ width: `${project.completion}%` }}></div></div><span className="text-xs text-gray-600">{project.completion}%</span></div></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="bg-blue-50 rounded-card p-6 border border-blue-100">
+                                <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                                <button onClick={() => onNavigate('newProject')} className="w-full bg-primary-blue text-white py-3 rounded-card font-medium hover:bg-blue-700 transition">➕ New Project</button>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-card p-6 card-shadow">
+                            <h2 className="text-lg font-semibold text-gray-900 mb-4">Activity Feed</h2>
+                            <div className="space-y-4">
+                                {[{ text: 'Interview with Klaus completed', time: '2 hours ago' }, { text: 'Analysis ready for AI Assessment', time: '4 hours ago' }, { text: 'Sarah invited to Product Req', time: '1 day ago' }].map((activity, i) => (
+                                    <div key={i} className="pb-4 border-b border-gray-100 last:border-b-0">
+                                        <p className="text-sm font-medium text-gray-900">{activity.text}</p>
+                                        <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function ProjectsList({ onNavigate, onProjectClick }) {
+            const [viewMode, setViewMode] = useState('table');
+            const [searchTerm, setSearchTerm] = useState('');
+
+            const filteredProjects = dummyProjects.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+            return (
+                <div className="p-8">
+                    <div className="flex items-center justify-between mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+                        <button onClick={() => onNavigate('newProject')} className="bg-primary-blue text-white px-6 py-2 rounded-card font-medium hover:bg-blue-700 transition">➕ New Project</button>
+                    </div>
+                    <div className="bg-white rounded-card p-4 card-shadow mb-6 flex items-center justify-between">
+                        <input type="text" placeholder="Search projects..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <div className="flex gap-2">
+                            <button onClick={() => setViewMode('table')} className={`px-3 py-2 rounded-card ${viewMode === 'table' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}>📋 Table</button>
+                            <button onClick={() => setViewMode('grid')} className={`px-3 py-2 rounded-card ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}>⊞ Grid</button>
+                        </div>
+                    </div>
+                    {viewMode === 'table' && (
+                        <div className="bg-white rounded-card card-shadow overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th className="text-left py-4 px-6 font-semibold text-gray-900">Name</th>
+                                        <th className="text-left py-4 px-6 font-semibold text-gray-900">Status</th>
+                                        <th className="text-left py-4 px-6 font-semibold text-gray-900">Interviews</th>
+                                        <th className="text-left py-4 px-6 font-semibold text-gray-900">Completion</th>
+                                        <th className="text-left py-4 px-6 font-semibold text-gray-900">Cost</th>
+                                        <th className="text-left py-4 px-6 font-semibold text-gray-900">Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredProjects.map((project) => (
+                                        <tr key={project.id} onClick={() => onProjectClick(project)} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition">
+                                            <td className="py-4 px-6 font-medium text-gray-900">{project.name}</td>
+                                            <td className="py-4 px-6"><StatusBadge status={project.status} /></td>
+                                            <td className="py-4 px-6 text-gray-700">{project.interviews}</td>
+                                            <td className="py-4 px-6"><div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-green-500" style={{ width: `${project.completion}%` }}></div></div></td>
+                                            <td className="py-4 px-6 text-gray-700">€{project.cost.toFixed(2)}</td>
+                                            <td className="py-4 px-6 text-gray-600 text-sm">{project.created}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    {viewMode === 'grid' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredProjects.map((project) => (
+                                <div key={project.id} onClick={() => onProjectClick(project)} className="bg-white rounded-card p-6 card-shadow hover-shadow cursor-pointer">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <h3 className="font-semibold text-gray-900">{project.name}</h3>
+                                        <StatusBadge status={project.status} />
+                                    </div>
+                                    <p className="text-sm text-gray-600 mb-4">Interviews: {project.interviews} • Completion: {project.completion}%</p>
+                                    <p className="text-lg font-bold text-gray-900">€{project.cost.toFixed(2)}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function NewProjectWizard({ step, setStep, onNavigate }) {
+            const steps = ['Basics', 'Questions', 'Agents', 'Appearance', 'Participants', 'Review & Launch'];
+
+            return (
+                <div className="p-8">
+                    <div className="mb-8">
+                        <div className="flex gap-2 mb-4">
+                            {steps.map((stepName, i) => (
+                                <div key={i} className="flex items-center">
+                                    <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm ${i < step ? 'bg-green-500 text-white' : i === step - 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                                        {i < step ? '✓' : i + 1}
+                                    </div>
+                                    {i < steps.length - 1 && <div className={`w-12 h-1 mx-1 ${i < step - 1 ? 'bg-green-500' : 'bg-gray-200'}`}></div>}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                            {steps.map((stepName, i) => (
+                                <span key={i} className={`text-xs font-medium ${i === step - 1 ? 'text-blue-600' : 'text-gray-600'}`}>{stepName}</span>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-card p-8 card-shadow max-w-3xl">
+                        {step === 1 && (
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Project Basics</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Project Title *</label>
+                                        <input type="text" placeholder="e.g., AI Readiness Assessment 2024" className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                                        <textarea placeholder="Brief overview..." rows={3} className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Research Objectives</label>
+                                        <textarea placeholder="What are you trying to learn?" rows={3} className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Target Audience</label>
+                                        <input type="text" placeholder="e.g., IT Managers, Decision Makers" className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
+                                            <select className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="EN">English</option>
+                                                <option value="DE">Deutsch</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Modality</label>
+                                            <select className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="text">Text Only</option>
+                                                <option value="voice">Voice Only</option>
+                                                <option value="both">Text + Voice</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Interviews</label>
+                                        <input type="number" defaultValue="10" className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {step === 2 && (
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Questions</h2>
+                                <button className="mb-4 px-4 py-2 bg-blue-50 text-blue-600 rounded-card font-medium hover:bg-blue-100">🤖 Generate with AI</button>
+                                <p className="text-gray-600 mb-4">Add questions manually or use AI to generate them.</p>
+                                <div className="border-2 border-dashed border-gray-300 rounded-card p-6 text-center"><p className="text-gray-600 mb-3">No questions added yet</p><button className="px-6 py-3 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700">➕ Add Question</button></div>
+                            </div>
+                        )}
+                        {step === 3 && (
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Agents</h2>
+                                <p className="text-gray-600 mb-6">Configure the AI agents that will conduct interviews. Add multiple agents and define how they collaborate.</p>
+                                <div className="bg-blue-50 rounded-card p-4 mb-6 border border-blue-200">
+                                    <p className="text-sm text-blue-900"><strong>Tip:</strong> Use agent archetypes as starting points. You can customize prompts, weights, and orchestration flow after setup.</p>
+                                </div>
+                                <h3 className="text-sm font-semibold text-gray-700 mb-3">Choose Archetypes to Start</h3>
+                                <div className="grid grid-cols-3 gap-3 mb-6">
+                                    {[{name: 'Exploratory', desc: 'Open-ended discovery, broad questions', icon: '🔍'}, {name: 'Technical', desc: 'Deep-dive into technical details', icon: '🔧'}, {name: 'Empathetic', desc: 'Sensitive topics, emotional support', icon: '💬'}, {name: 'Challenging', desc: 'Push-back, devil\'s advocate', icon: '⚡'}, {name: 'Observer', desc: 'Silent monitoring, interjects on triggers', icon: '👁'}, {name: 'Custom', desc: 'Build from scratch', icon: '✏️'}].map((arch, i) => (
+                                        <button key={i} className="bg-white border-2 border-gray-200 rounded-card p-4 text-left hover:border-blue-400 hover-shadow transition">
+                                            <div className="flex items-center gap-2 mb-1"><span className="text-lg">{arch.icon}</span><span className="font-semibold text-gray-900 text-sm">{arch.name}</span></div>
+                                            <p className="text-xs text-gray-600">{arch.desc}</p>
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="border-t pt-4">
+                                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Multi-Agent Setup</h3>
+                                    <p className="text-xs text-gray-500 mb-3">When using 2+ agents, you'll define an orchestration flow in the project detail view after creation. The flow designer lets you set transition conditions, weights, and handoff messages between agents.</p>
+                                    <div className="bg-gray-50 rounded-card p-4 flex items-center gap-4">
+                                        <div className="flex items-center gap-1">
+                                            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">E</div>
+                                            <span className="text-gray-400 text-lg">→</span>
+                                            <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">T</div>
+                                            <span className="text-gray-400 text-lg">→</span>
+                                            <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">✓</div>
+                                        </div>
+                                        <p className="text-xs text-gray-600 flex-1">Example: Exploratory agent discovers context → hands off to Technical agent for deep-dive → interview completes</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {step === 4 && (
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Appearance</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Landing Page Title</label>
+                                        <input type="text" placeholder="Interview Title" className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Primary Color</label>
+                                        <input type="color" defaultValue="#2563EB" className="h-10 rounded-card cursor-pointer" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Logo Upload</label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-card p-6 text-center"><p className="text-gray-600">Drag and drop or click to upload</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {step === 5 && (
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Participants</h2>
+                                <div className="space-y-4">
+                                    <button className="w-full px-4 py-3 border border-gray-300 rounded-card hover:bg-gray-50 font-medium">➕ Add Manually</button>
+                                    <button className="w-full px-4 py-3 border border-gray-300 rounded-card hover:bg-gray-50 font-medium">📤 Import CSV</button>
+                                </div>
+                            </div>
+                        )}
+                        {step === 6 && (
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Review & Launch</h2>
+                                <div className="bg-blue-50 rounded-card p-4 mb-6 border border-blue-200">
+                                    <p className="font-semibold text-gray-900 mb-2">AI Readiness Score</p>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden"><div className="bg-green-500 h-full" style={{ width: '78%' }}></div></div>
+                                        <span className="font-bold text-gray-900">78/100</span>
+                                    </div>
+                                    <p className="text-xs text-gray-600 mt-2">Good! Add more agents for higher scores.</p>
+                                </div>
+                                <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside"><li>Add 1-2 more agents</li><li>Consider adding voice modality</li></ul>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex gap-4 justify-end mt-6">
+                        <button onClick={() => step > 1 ? setStep(step - 1) : onNavigate('projects')} className="px-6 py-2 border border-gray-300 rounded-card font-medium hover:bg-gray-50">{step === 1 ? 'Cancel' : 'Back'}</button>
+                        {step < steps.length && <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700">Next</button>}
+                        {step === steps.length && (
+                            <>
+                                <button className="px-6 py-2 border border-gray-300 rounded-card font-medium hover:bg-gray-50">Save as Draft</button>
+                                <button onClick={() => onNavigate('dashboard')} className="px-6 py-2 bg-green-600 text-white rounded-card font-medium hover:bg-green-700">Start Testing</button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function ProjectDetail({ project, tab, setTab }) {
+            const tabs = ['Overview', 'Questions', 'Agents', 'Testing', 'Monitoring', 'Appearance', 'Analysis', 'Costs', 'Settings'];
+
+            return (
+                <div className="p-8">
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2">{project.name}</h1>
+                        <StatusBadge status={project.status} />
+                    </div>
+                    <div className="bg-white rounded-t-card border-b border-gray-200 card-shadow">
+                        <div className="flex overflow-x-auto scrollbar-hide">
+                            {tabs.map((tabName) => (
+                                <button key={tabName} onClick={() => setTab(tabName.toLowerCase())} className={`px-6 py-4 font-medium text-sm border-b-2 transition whitespace-nowrap ${tab === tabName.toLowerCase() ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
+                                    {tabName}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-b-card card-shadow p-8">
+                        {tab === 'overview' && (
+                            <div>
+                                <div className="mb-8">
+                                    <h2 className="text-xl font-bold text-gray-900 mb-4">Project Status</h2>
+                                    <div className="flex gap-3">
+                                        <button className="px-4 py-2 bg-blue-100 text-blue-600 rounded-card font-medium text-sm hover:bg-blue-200">Start Testing</button>
+                                        <button className="px-4 py-2 border border-gray-300 rounded-card font-medium text-sm hover:bg-gray-50">Activate</button>
+                                        <button className="px-4 py-2 border border-gray-300 rounded-card font-medium text-sm hover:bg-gray-50">Pause</button>
+                                        <button className="px-4 py-2 border border-gray-300 rounded-card font-medium text-sm hover:bg-gray-50">Archive</button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 gap-4 mb-8">
+                                    {[{label: 'Interviews', value: project.interviews}, {label: 'Completion', value: project.completion + '%'}, {label: 'Total Cost', value: '€' + project.cost.toFixed(2)}, {label: 'Avg Duration', value: '18m'}].map((item, i) => (
+                                        <div key={i} className="bg-gray-50 rounded-card p-6"><p className="text-gray-600 text-sm font-medium mb-2">{item.label}</p><p className="text-3xl font-bold text-gray-900">{item.value}</p></div>
+                                    ))}
+                                </div>
+                                <div className="border-t pt-8"><h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3><div className="space-y-3">
+                                    {['Interview completed - 2 hours ago', 'Participant joined - 1 day ago', 'Project created - 3 days ago'].map((activity, i) => (
+                                        <div key={i} className="flex items-center gap-3 pb-3 border-b border-gray-100 last:border-b-0"><div className="w-2 h-2 bg-blue-600 rounded-full"></div><p className="text-sm text-gray-700">{activity}</p></div>
+                                    ))}
+                                </div></div>
+                            </div>
+                        )}
+                        {tab === 'testing' && <TestingTab />}
+                        {tab === 'monitoring' && (
+                            <div className="space-y-8">
+                                <div className="grid grid-cols-4 gap-4">
+                                    {[{label: 'Active Now', value: 2, color: 'blue'}, {label: 'Completed Today', value: 5, color: 'green'}, {label: 'Avg Duration', value: '18m', color: 'purple'}, {label: 'Completion', value: project.completion + '%', color: 'orange'}].map((item, i) => (
+                                        <div key={i} className={`bg-${item.color}-50 rounded-card p-6 border border-${item.color}-200`}><p className={`text-${item.color}-900 text-sm font-medium mb-2`}>{item.label}</p><p className={`text-3xl font-bold text-${item.color}-600`}>{item.value}</p></div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {tab === 'costs' && (
+                            <div className="space-y-8">
+                                <div className="grid grid-cols-3 gap-6">
+                                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-card p-8 text-white"><p className="opacity-90 mb-2">Total Cost</p><p className="text-4xl font-bold">€{project.cost.toFixed(2)}</p><p className="text-sm opacity-75 mt-4">Cost per interview: €{(project.cost / project.interviews).toFixed(2)}</p></div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {[{label: 'LLM Calls', pct: 45}, {label: 'Speech', pct: 30}, {label: 'Storage', pct: 20}, {label: 'Other', pct: 5}].map((item, i) => (
+                                            <div key={i} className="bg-gray-50 rounded-card p-6"><p className="text-gray-600 text-sm mb-2">{item.label}</p><p className="text-2xl font-bold text-gray-900">€{(project.cost * item.pct / 100).toFixed(2)}</p><p className="text-xs text-gray-500 mt-2">{item.pct}%</p></div>
+                                        ))}
+                                    </div>
+                                    <div className="bg-yellow-50 rounded-card p-6 border border-yellow-200"><p className="font-semibold text-yellow-900 mb-3">Budget Alert</p><p className="text-sm text-yellow-800 mb-4">At 68% of monthly budget (€500)</p><button className="w-full px-4 py-2 bg-yellow-600 text-white rounded-card font-medium text-sm hover:bg-yellow-700">Update Budget</button></div>
+                                </div>
+                            </div>
+                        )}
+                        {tab === 'settings' && (
+                            <div className="space-y-8">
+                                <div><h3 className="text-lg font-bold text-gray-900 mb-4">General Settings</h3><div className="space-y-4 max-w-md"><div><label className="block text-sm font-medium text-gray-700 mb-2">Project Name</label><input type="text" placeholder="Project name" className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" /></div></div></div>
+                                <div className="border-t pt-8"><h3 className="text-lg font-bold text-red-600 mb-4">Danger Zone</h3><button className="px-6 py-3 bg-red-600 text-white rounded-card font-medium hover:bg-red-700">Delete Project</button></div>
+                            </div>
+                        )}
+                        {tab === 'agents' && <AgentsTab />}
+                        {['questions', 'appearance', 'analysis'].includes(tab) && <div className="text-center py-12"><p className="text-gray-600">Content for {tab} tab</p></div>}
+                    </div>
+                </div>
+            );
+        }
+
+        function TestingTab() {
+            const [testView, setTestView] = useState('run');
+            const [scientificEnabled, setScientificEnabled] = useState(false);
+            const [selectedMethodology, setSelectedMethodology] = useState([]);
+
+            const iqs = { overall: 78, followup: 82, probing: 71, questionQuality: 88, neutrality: 85, topicCoverage: 73, coherence: 80, dataRichness: 65 };
+            const testHistory = [
+                { id: 1, date: '2024-02-21 14:30', persona: 'Cooperative', questions: 12, iqs: 78, coverage: 85 },
+                { id: 2, date: '2024-02-21 10:15', persona: 'Resistant', questions: 10, iqs: 62, coverage: 70 },
+                { id: 3, date: '2024-02-20 16:45', persona: 'Verbose', questions: 14, iqs: 74, coverage: 90 },
+            ];
+
+            const getScoreColor = (score) => score >= 70 ? 'green' : score >= 50 ? 'yellow' : 'red';
+            const getScoreBg = (score) => score >= 70 ? 'bg-green-500' : score >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+
+            return (
+                <div>
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900">Testing & Quality Evaluation</h2>
+                            <p className="text-sm text-gray-600 mt-1">Validate your interviewer AI before going live. Projects must pass the Quality Gate to activate.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-card px-4 py-2">
+                                <div className={`w-3 h-3 rounded-full ${getScoreBg(iqs.overall)}`}></div>
+                                <span className="text-sm font-bold text-green-900">IQS: {iqs.overall}/100</span>
+                            </div>
+                            <span className="text-xs text-green-600 font-medium px-2 py-1 bg-green-50 rounded">✓ Quality Gate: PASS</span>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 mb-6">
+                        <button onClick={() => setTestView('run')} className={`px-4 py-2 rounded-card font-medium text-sm ${testView === 'run' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>🧪 Test Run</button>
+                        <button onClick={() => setTestView('evaluation')} className={`px-4 py-2 rounded-card font-medium text-sm ${testView === 'evaluation' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📊 Quality Evaluation</button>
+                        <button onClick={() => setTestView('scientific')} className={`px-4 py-2 rounded-card font-medium text-sm ${testView === 'scientific' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>🔬 Scientific Evaluation</button>
+                        <button onClick={() => setTestView('history')} className={`px-4 py-2 rounded-card font-medium text-sm ${testView === 'history' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📋 Test History</button>
+                    </div>
+
+                    {testView === 'run' && (
+                        <div className="grid grid-cols-3 gap-6">
+                            <div className="col-span-2">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">AI Test Run — Simulated Interview</h3>
+                                <div className="bg-gray-50 rounded-card p-6 h-80 flex flex-col">
+                                    <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+                                        <div className="flex gap-3"><div className="w-8 h-8 bg-blue-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">D</div><div className="chat-bubble-agent rounded-card p-3 max-w-sm"><p className="text-sm">Hello! Thank you for joining. Could you start by telling me about your organization's current AI capabilities?</p><p className="text-xs text-gray-400 mt-1">Discovery Agent • Q1 of 12</p></div></div>
+                                        <div className="flex justify-end"><div className="chat-bubble-user rounded-card p-3 max-w-sm"><p className="text-sm">We've started using AI for customer support chatbots, but we're still early in our journey.</p><p className="text-xs text-blue-200 mt-1">Cooperative Persona</p></div></div>
+                                        <div className="flex gap-3"><div className="w-8 h-8 bg-blue-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">D</div><div className="chat-bubble-agent rounded-card p-3 max-w-sm"><p className="text-sm">That's interesting. What specific challenges have you encountered with the chatbot implementation?</p><p className="text-xs text-gray-400 mt-1">Discovery Agent • Follow-up (depth 2/3)</p></div></div>
+                                        <div className="flex justify-end"><div className="chat-bubble-user rounded-card p-3 max-w-sm"><p className="text-sm">The main challenge has been data quality. Our training data was inconsistent and the bot kept giving wrong answers to edge cases.</p></div></div>
+                                        <div className="flex gap-3"><div className="w-8 h-8 bg-purple-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">T</div><div className="chat-bubble-agent rounded-card p-3 max-w-sm border-l-4 border-purple-300"><p className="text-xs text-purple-600 font-medium mb-1">Agent Handoff: Discovery → Technical (topic_coverage ≥ 80%)</p><p className="text-sm">I'd like to explore the technical side. When you say 'edge cases', can you walk me through a specific example where the bot failed?</p><p className="text-xs text-gray-400 mt-1">Technical Agent • Probing depth 1/5</p></div></div>
+                                    </div>
+                                    <div className="flex gap-2"><input type="text" placeholder="AI Test Agent responds automatically..." className="flex-1 px-4 py-2 border border-gray-300 rounded-card bg-gray-100 text-gray-500 cursor-not-allowed" disabled /><button className="px-4 py-2 bg-red-500 text-white rounded-card font-medium hover:bg-red-600 text-sm">⏹ Stop Test</button></div>
+                                </div>
+                                <div className="mt-4 bg-blue-50 rounded-card p-4 border border-blue-200">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="font-semibold text-blue-900 text-sm">Live Quality Indicators</h4>
+                                        <span className="text-xs text-blue-600">Updated in real-time during test</span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-3">
+                                        {[{label: 'Follow-up Relevance', value: '0.85', status: 'pass'}, {label: 'Probing Depth', value: '2.3/3', status: 'pass'}, {label: 'Neutrality', value: '94%', status: 'pass'}, {label: 'Topic Coverage', value: '45%', status: 'progress'}].map((item, i) => (
+                                            <div key={i} className="bg-white rounded p-3 text-center">
+                                                <p className="text-xs text-gray-600 mb-1">{item.label}</p>
+                                                <p className={`text-lg font-bold ${item.status === 'pass' ? 'text-green-600' : 'text-blue-600'}`}>{item.value}</p>
+                                                <span className={`text-xs font-medium ${item.status === 'pass' ? 'text-green-500' : 'text-blue-500'}`}>{item.status === 'pass' ? '✓ Pass' : '◐ In progress'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div className="bg-gray-50 rounded-card p-5 mb-4">
+                                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Test Configuration</h4>
+                                    <div className="space-y-3 text-sm">
+                                        <div><p className="font-medium text-gray-700 mb-1">Test Persona</p><select className="w-full px-3 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"><option>Cooperative</option><option>Resistant</option><option>Verbose</option><option>Terse</option><option>Confused</option></select></div>
+                                        <button className="w-full px-3 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700 text-sm">🚀 Launch New Test Run</button>
+                                        <p className="text-xs text-gray-500">Test all 5 personas before activation for best coverage.</p>
+                                    </div>
+                                </div>
+                                <div className="bg-gray-50 rounded-card p-5 mb-4">
+                                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Debug Panel</h4>
+                                    <div className="space-y-3 text-sm">
+                                        <div><p className="text-xs font-medium text-gray-600 mb-1">Active Agent</p><div className="flex items-center gap-2"><div className="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">T</div><span className="font-medium">Technical Deep-Dive</span></div></div>
+                                        <div className="border-t pt-2"><p className="text-xs font-medium text-gray-600 mb-1">Agent Reasoning</p><div className="bg-white rounded p-2 text-xs text-gray-700 h-20 overflow-y-auto font-mono"><p>{"→ topic_coverage(discovery)=82%"}</p><p>{"→ transition: discovery→technical"}</p><p>{"→ handoff_msg: 'explore technical...'"}</p><p>{"→ probing_depth: 1/5, target: 3+"}</p></div></div>
+                                        <div className="border-t pt-2"><p className="text-xs font-medium text-gray-600 mb-1">Sentiment Trend</p><div className="flex items-center gap-2"><span className="text-green-600 font-medium">Positive 78%</span><span className="text-xs text-gray-400">↑ from 72%</span></div></div>
+                                        <div className="border-t pt-2"><p className="text-xs font-medium text-gray-600 mb-1">Flow Position</p><div className="flex items-center gap-1 text-xs"><span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded">START</span><span>→</span><span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Discovery</span><span>→</span><span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-bold">Technical ●</span><span>→</span><span className="px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded">END</span></div></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {testView === 'evaluation' && (
+                        <div>
+                            <div className="grid grid-cols-4 gap-4 mb-6">
+                                <div className="col-span-1 bg-white border-2 border-green-300 rounded-card p-6 text-center">
+                                    <p className="text-sm text-gray-600 mb-2">Interview Quality Score</p>
+                                    <div className="relative inline-block">
+                                        <svg width="120" height="120" viewBox="0 0 120 120">
+                                            <circle cx="60" cy="60" r="50" fill="none" stroke="#E5E7EB" strokeWidth="10" />
+                                            <circle cx="60" cy="60" r="50" fill="none" stroke="#22C55E" strokeWidth="10" strokeDasharray={`${iqs.overall * 3.14} 314`} strokeLinecap="round" transform="rotate(-90 60 60)" />
+                                            <text x="60" y="55" textAnchor="middle" className="text-2xl font-bold" fill="#111827" fontSize="28">{iqs.overall}</text>
+                                            <text x="60" y="75" textAnchor="middle" fill="#6B7280" fontSize="12">/100</text>
+                                        </svg>
+                                    </div>
+                                    <p className="text-xs text-green-600 font-medium mt-2">✓ Above threshold (70)</p>
+                                </div>
+                                <div className="col-span-3">
+                                    <h3 className="font-semibold text-gray-900 mb-3">Sub-Score Breakdown</h3>
+                                    <div className="space-y-2">
+                                        {[
+                                            { label: 'Follow-up Relevance', score: iqs.followup, weight: '20%', detail: 'Semantic similarity between participant answers and follow-up questions' },
+                                            { label: 'Probing Effectiveness', score: iqs.probing, weight: '20%', detail: 'DICE framework: diversity, depth progression, follow-up ratio' },
+                                            { label: 'Question Quality', score: iqs.questionQuality, weight: '15%', detail: 'No leading, double-barreled, or loaded questions detected' },
+                                            { label: 'Interviewer Neutrality', score: iqs.neutrality, weight: '15%', detail: 'Consistent validation, stable behavior, no suggestive language' },
+                                            { label: 'Topic Coverage', score: iqs.topicCoverage, weight: '15%', detail: '73% of planned topics addressed at sufficient depth' },
+                                            { label: 'Conversation Coherence', score: iqs.coherence, weight: '10%', detail: 'Smooth transitions, no abrupt topic jumps' },
+                                            { label: 'Data Richness', score: iqs.dataRichness, weight: '5%', detail: 'Response length, lexical diversity, conceptual density' },
+                                        ].map((item, i) => (
+                                            <div key={i} className="flex items-center gap-3">
+                                                <span className="text-xs text-gray-500 w-8">{item.weight}</span>
+                                                <span className="text-sm font-medium text-gray-900 w-44">{item.label}</span>
+                                                <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden"><div className={`h-full rounded-full ${item.score >= 70 ? 'bg-green-500' : item.score >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${item.score}%` }}></div></div>
+                                                <span className={`text-sm font-bold w-10 text-right ${item.score >= 70 ? 'text-green-600' : item.score >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>{item.score}</span>
+                                                <span className={`text-xs px-2 py-0.5 rounded-full ${item.score >= 70 ? 'bg-green-100 text-green-700' : item.score >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{item.score >= 70 ? '✓ Pass' : item.score >= 50 ? '⚠ Warning' : '✕ Fail'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-card p-5">
+                                    <h4 className="font-semibold text-yellow-900 mb-3 text-sm">⚠ Issues Found (3)</h4>
+                                    <div className="space-y-3">
+                                        <div className="bg-white rounded p-3 border border-yellow-200">
+                                            <div className="flex items-center justify-between mb-1"><span className="text-xs font-medium text-yellow-800">Probing Effectiveness — Q5</span><span className="text-xs px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded-full">Medium</span></div>
+                                            <p className="text-xs text-gray-700 mb-2">Probing depth on Q5 ("How do you handle data governance?") only reached level 1/3. Agent accepted the first answer without probing deeper. Sensitive governance topics need depth 3+.</p>
+                                            <button className="text-xs text-blue-600 font-medium hover:underline">Fix: Increase probing depth →</button>
+                                        </div>
+                                        <div className="bg-white rounded p-3 border border-yellow-200">
+                                            <div className="flex items-center justify-between mb-1"><span className="text-xs font-medium text-yellow-800">Follow-up Relevance — Q7→Q8</span><span className="text-xs px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded-full">Medium</span></div>
+                                            <p className="text-xs text-gray-700 mb-2">Follow-up scored 0.42 relevance. Agent asked about "budget allocation" when participant was discussing "team readiness". The topics are related but the transition was abrupt.</p>
+                                            <button className="text-xs text-blue-600 font-medium hover:underline">Fix: Add transition prompt →</button>
+                                        </div>
+                                        <div className="bg-white rounded p-3 border border-yellow-200">
+                                            <div className="flex items-center justify-between mb-1"><span className="text-xs font-medium text-yellow-800">Topic Coverage — "Security"</span><span className="text-xs px-2 py-0.5 bg-orange-200 text-orange-800 rounded-full">High</span></div>
+                                            <p className="text-xs text-gray-700 mb-2">Planned topic "Security & Compliance" was not addressed in any test run. 0% coverage. This topic appears in your interview guide but no agent has questions assigned to it.</p>
+                                            <button className="text-xs text-blue-600 font-medium hover:underline">Fix: Assign topic to agent →</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-white border border-gray-200 rounded-card p-5">
+                                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Quality Gate Status</h4>
+                                    <div className="space-y-3">
+                                        {[
+                                            { check: 'At least 1 AI test run completed', pass: true, detail: '3 runs completed' },
+                                            { check: 'IQS ≥ 70/100', pass: true, detail: 'Current: 78/100' },
+                                            { check: 'AI Readiness Score ≥ 60/100', pass: true, detail: 'Current: 85/100' },
+                                            { check: 'All critical issues resolved', pass: true, detail: '0 critical, 3 medium' },
+                                            { check: 'Tested with Cooperative persona', pass: true, detail: 'Run #1' },
+                                            { check: 'Tested with Resistant persona', pass: true, detail: 'Run #2' },
+                                            { check: 'Tested with Verbose persona', pass: true, detail: 'Run #3' },
+                                            { check: 'Tested with Terse persona', pass: false, detail: 'Not yet tested' },
+                                            { check: 'Tested with Confused persona', pass: false, detail: 'Not yet tested' },
+                                        ].map((item, i) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <span className={`text-sm ${item.pass ? 'text-green-500' : 'text-gray-400'}`}>{item.pass ? '✓' : '○'}</span>
+                                                <span className="text-xs text-gray-700 flex-1">{item.check}</span>
+                                                <span className={`text-xs ${item.pass ? 'text-green-600' : 'text-gray-400'}`}>{item.detail}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-4 pt-3 border-t">
+                                        <button className="w-full px-4 py-2 bg-green-600 text-white rounded-card font-medium hover:bg-green-700 text-sm">✓ Activate Project (Gate Passed)</button>
+                                        <p className="text-xs text-gray-500 mt-2 text-center">Recommended: test remaining 2 personas first</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-card font-medium text-sm hover:bg-blue-100">⟳ Re-run Evaluation</button>
+                                <button className="px-4 py-2 border border-gray-300 rounded-card font-medium text-sm hover:bg-gray-50">📥 Download Report (PDF)</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {testView === 'scientific' && (
+                        <div>
+                            <div className="bg-purple-50 border border-purple-200 rounded-card p-5 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="font-semibold text-purple-900">Scientific Evaluation Module</h3>
+                                        <p className="text-sm text-purple-700 mt-1">Adds research-grade evaluation metrics based on established qualitative research methodologies. Recommended for academic research, regulatory studies, and formal evaluations.</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm text-purple-800 font-medium">{scientificEnabled ? 'Enabled' : 'Disabled'}</span>
+                                        <button onClick={() => setScientificEnabled(!scientificEnabled)} className={`relative w-12 h-6 rounded-full transition ${scientificEnabled ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                                            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition ${scientificEnabled ? 'left-6' : 'left-0.5'}`}></div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {scientificEnabled && (
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 mb-4">Select Methodology</h3>
+                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                        {[
+                                            { id: 'braun-clarke', name: 'Thematic Analysis', author: 'Braun & Clarke', desc: '15-point quality checklist. Evaluates coding coverage, theme coherence, contradictions, analytic depth. 40% automated + 60% expert review.', autoLevel: 40, items: '15 checklist items' },
+                                            { id: 'coreq', name: 'COREQ Compliance', author: 'Tong et al.', desc: '32-item Consolidated Criteria for Reporting Qualitative Research, adapted for AI interviews. Documents AI model, limitations, human intervention.', autoLevel: 70, items: '32 checklist items' },
+                                            { id: 'grounded-theory', name: 'Grounded Theory', author: 'Glaser & Strauss', desc: 'Evaluates credibility/fit, applicability, conceptual density, explanatory power. Includes theoretical saturation monitoring.', autoLevel: 30, items: '5 quality dimensions' },
+                                            { id: 'ipa', name: 'IPA', author: 'Smith et al.', desc: 'Interpretative Phenomenological Analysis. 4-marker quality: compelling narrative, experiential depth, analytic reading, convergence/divergence.', autoLevel: 20, items: '4 quality markers' },
+                                        ].map(method => (
+                                            <div key={method.id} onClick={() => setSelectedMethodology(prev => prev.includes(method.id) ? prev.filter(m => m !== method.id) : [...prev, method.id])} className={`bg-white border-2 rounded-card p-5 cursor-pointer transition hover-shadow ${selectedMethodology.includes(method.id) ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'}`}>
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div>
+                                                        <h4 className="font-semibold text-gray-900">{method.name}</h4>
+                                                        <p className="text-xs text-gray-500">{method.author}</p>
+                                                    </div>
+                                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedMethodology.includes(method.id) ? 'bg-purple-500 border-purple-500' : 'border-gray-300'}`}>{selectedMethodology.includes(method.id) && <span className="text-white text-xs">✓</span>}</div>
+                                                </div>
+                                                <p className="text-xs text-gray-600 mb-3">{method.desc}</p>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500">{method.items}</span>
+                                                    <span className="text-xs font-medium text-purple-600">{method.autoLevel}% automatable</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {selectedMethodology.length > 0 && (
+                                        <div>
+                                            <h3 className="font-semibold text-gray-900 mb-4">Evaluation Results</h3>
+                                            {selectedMethodology.includes('braun-clarke') && (
+                                                <div className="bg-white border border-gray-200 rounded-card p-5 mb-4">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <div className="flex items-center gap-2"><span className="text-lg">📝</span><h4 className="font-semibold text-gray-900">Thematic Analysis (Braun & Clarke)</h4></div>
+                                                        <span className="text-sm font-bold text-green-600">11/15 passed</span>
+                                                    </div>
+                                                    <div className="space-y-2 mb-4">
+                                                        {[
+                                                            { item: 'Data coded comprehensively', status: 'auto-pass', type: 'auto' },
+                                                            { item: 'Themes internally coherent (cosine > 0.7)', status: 'auto-pass', type: 'auto' },
+                                                            { item: 'Between-theme distinctiveness (similarity < 0.4)', status: 'auto-pass', type: 'auto' },
+                                                            { item: 'Adequate data examples per theme (≥ 3 quotes)', status: 'auto-warn', type: 'auto' },
+                                                            { item: 'Analysis beyond description to interpretation', status: 'expert-pending', type: 'expert' },
+                                                            { item: 'Contradictions acknowledged and explored', status: 'auto-pass', type: 'auto' },
+                                                        ].map((check, i) => (
+                                                            <div key={i} className="flex items-center gap-2 text-xs">
+                                                                <span className={check.status === 'auto-pass' ? 'text-green-500' : check.status === 'auto-warn' ? 'text-yellow-500' : 'text-blue-500'}>{check.status === 'auto-pass' ? '✓' : check.status === 'auto-warn' ? '⚠' : '👤'}</span>
+                                                                <span className="text-gray-700 flex-1">{check.item}</span>
+                                                                <span className={`px-2 py-0.5 rounded-full text-xs ${check.type === 'auto' ? 'bg-gray-100 text-gray-600' : 'bg-blue-100 text-blue-600'}`}>{check.type === 'auto' ? 'Automated' : 'Expert Review'}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="bg-yellow-50 rounded p-3 border border-yellow-200">
+                                                        <p className="text-xs text-yellow-800"><strong>Action needed:</strong> Theme "Technical Readiness" has only 2 supporting quotes. Conduct 1-2 more interviews or merge with "Infrastructure Maturity" theme.</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {selectedMethodology.includes('grounded-theory') && (
+                                                <div className="bg-white border border-gray-200 rounded-card p-5 mb-4">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <div className="flex items-center gap-2"><span className="text-lg">🔬</span><h4 className="font-semibold text-gray-900">Grounded Theory (Glaser & Strauss)</h4></div>
+                                                        <span className="text-sm font-bold text-yellow-600">3.8/5.0</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-5 gap-3 mb-4">
+                                                        {[
+                                                            { dim: 'Credibility', score: 4.2, weight: '50%' },
+                                                            { dim: 'Applicability', score: 3.5, weight: '20%' },
+                                                            { dim: 'Density', score: 3.8, weight: '15%' },
+                                                            { dim: 'Explanatory', score: 3.0, weight: '10%' },
+                                                            { dim: 'Modifiability', score: 4.0, weight: '5%' },
+                                                        ].map((item, i) => (
+                                                            <div key={i} className="text-center bg-gray-50 rounded p-3">
+                                                                <p className="text-xs text-gray-600 mb-1">{item.dim}</p>
+                                                                <p className={`text-lg font-bold ${item.score >= 3.5 ? 'text-green-600' : 'text-yellow-600'}`}>{item.score}</p>
+                                                                <p className="text-xs text-gray-400">{item.weight}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="bg-blue-50 rounded p-3 border border-blue-200">
+                                                        <p className="text-xs text-blue-800"><strong>Saturation Indicator:</strong> 8 interviews completed. New codes per interview: 12, 8, 5, 3, 2, 1, 0, 0. Theoretical saturation likely reached (2 consecutive zero-new-code interviews).</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {selectedMethodology.includes('coreq') && (
+                                                <div className="bg-white border border-gray-200 rounded-card p-5 mb-4">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex items-center gap-2"><span className="text-lg">📋</span><h4 className="font-semibold text-gray-900">COREQ Compliance</h4></div>
+                                                        <span className="text-sm font-bold text-green-600">28/32 items addressed</span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-600 mb-3">Auto-populated from project configuration. 4 items require manual input (highlighted).</p>
+                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                        {[
+                                                            { item: 'AI model documented', status: 'auto', value: 'Claude 3.5 Sonnet, temp=0.7' },
+                                                            { item: 'Interview protocol', status: 'auto', value: 'Linked to question guide' },
+                                                            { item: 'Data collection method', status: 'auto', value: 'Text + Voice, encrypted' },
+                                                            { item: 'Researcher reflexivity', status: 'manual', value: 'Requires input' },
+                                                        ].map((check, i) => (
+                                                            <div key={i} className={`flex items-center gap-2 p-2 rounded ${check.status === 'manual' ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'}`}>
+                                                                <span className={check.status === 'auto' ? 'text-green-500' : 'text-yellow-500'}>{check.status === 'auto' ? '✓' : '✎'}</span>
+                                                                <div className="flex-1"><p className="font-medium text-gray-700">{check.item}</p><p className="text-gray-500">{check.value}</p></div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="flex gap-2">
+                                                <button className="px-4 py-2 bg-purple-600 text-white rounded-card font-medium text-sm hover:bg-purple-700">⟳ Run Scientific Evaluation</button>
+                                                <button className="px-4 py-2 border border-gray-300 rounded-card font-medium text-sm hover:bg-gray-50">📥 Export Methodology Report</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {!scientificEnabled && (
+                                <div className="text-center py-12 bg-gray-50 rounded-card">
+                                    <p className="text-4xl mb-4">🔬</p>
+                                    <p className="text-gray-600 mb-2">Scientific evaluation is not enabled for this project.</p>
+                                    <p className="text-sm text-gray-500">Enable above to add research-grade evaluation using Braun & Clarke, COREQ, Grounded Theory, or IPA methodologies.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {testView === 'history' && (
+                        <div>
+                            <h3 className="font-semibold text-gray-900 mb-4">Test Run History</h3>
+                            <div className="bg-white border border-gray-200 rounded-card overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50 border-b"><tr>
+                                        <th className="text-left py-3 px-4 font-semibold text-gray-600">Run</th>
+                                        <th className="text-left py-3 px-4 font-semibold text-gray-600">Date</th>
+                                        <th className="text-left py-3 px-4 font-semibold text-gray-600">Persona</th>
+                                        <th className="text-left py-3 px-4 font-semibold text-gray-600">Questions</th>
+                                        <th className="text-left py-3 px-4 font-semibold text-gray-600">IQS</th>
+                                        <th className="text-left py-3 px-4 font-semibold text-gray-600">Coverage</th>
+                                        <th className="text-left py-3 px-4 font-semibold text-gray-600">Actions</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        {testHistory.map((run, i) => (
+                                            <tr key={run.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                                <td className="py-3 px-4 font-medium text-gray-900">#{run.id}</td>
+                                                <td className="py-3 px-4 text-gray-600">{run.date}</td>
+                                                <td className="py-3 px-4"><span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs font-medium">{run.persona}</span></td>
+                                                <td className="py-3 px-4 text-gray-700">{run.questions}</td>
+                                                <td className="py-3 px-4"><span className={`font-bold ${run.iqs >= 70 ? 'text-green-600' : run.iqs >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>{run.iqs}/100</span></td>
+                                                <td className="py-3 px-4"><div className="flex items-center gap-2"><div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: `${run.coverage}%` }}></div></div><span className="text-xs text-gray-600">{run.coverage}%</span></div></td>
+                                                <td className="py-3 px-4"><div className="flex gap-1"><button className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100">View</button><button className="px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100">Compare</button></div></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="mt-4 bg-blue-50 rounded-card p-4 border border-blue-200">
+                                <h4 className="font-semibold text-blue-900 mb-2 text-sm">IQS Trend</h4>
+                                <div className="flex items-end gap-6 h-24">
+                                    {testHistory.slice().reverse().map((run, i) => (
+                                        <div key={i} className="flex flex-col items-center gap-1">
+                                            <span className="text-xs font-bold text-gray-900">{run.iqs}</span>
+                                            <div className={`w-8 rounded-t ${run.iqs >= 70 ? 'bg-green-500' : run.iqs >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ height: `${run.iqs}%` }}></div>
+                                            <span className="text-xs text-gray-500">{run.persona.substring(0, 4)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function AgentsTab() {
+            const [view, setView] = useState('list');
+            const [selectedAgent, setSelectedAgent] = useState(null);
+            const [showAddAgent, setShowAddAgent] = useState(false);
+
+            const agents = [
+                { id: 1, name: 'Discovery Agent', archetype: 'Exploratory', weight: 0.4, topics: ['general', 'discovery'], priority: 'primary', questions: 12, maxBeforeHandoff: 8, color: '#3B82F6', prompt: 'You are a skilled interviewer focused on open-ended discovery. Ask broad questions to understand the participant\'s context and experience.' },
+                { id: 2, name: 'Technical Deep-Dive', archetype: 'Technical', weight: 0.35, topics: ['technical', 'architecture'], priority: 'secondary', questions: 8, maxBeforeHandoff: 6, color: '#8B5CF6', prompt: 'You are a technical expert interviewer. Probe deeply into technical decisions, architecture choices, and implementation details.' },
+                { id: 3, name: 'Sentiment Observer', archetype: 'Observer', weight: 0.25, topics: ['sentiment', 'emotion'], priority: 'observer', questions: 0, maxBeforeHandoff: 0, color: '#F59E0B', prompt: 'You observe the conversation silently and only interject when you detect strong emotional signals or contradictions.' },
+            ];
+
+            const flowNodes = [
+                { id: 'start', label: 'Start', x: 60, y: 150, type: 'start' },
+                { id: 'agent1', label: 'Discovery Agent', x: 240, y: 80, type: 'agent', agentId: 1, color: '#3B82F6' },
+                { id: 'agent2', label: 'Technical Deep-Dive', x: 480, y: 80, type: 'agent', agentId: 2, color: '#8B5CF6' },
+                { id: 'agent3', label: 'Sentiment Observer', x: 360, y: 230, type: 'agent', agentId: 3, color: '#F59E0B' },
+                { id: 'end', label: 'End', x: 660, y: 150, type: 'end' },
+            ];
+
+            const flowEdges = [
+                { from: 'start', to: 'agent1', label: 'Entry', condition: 'always' },
+                { from: 'agent1', to: 'agent2', label: 'topic_coverage >= 80%', condition: 'topic_coverage >= 80%', weight: 0.8 },
+                { from: 'agent1', to: 'agent3', label: 'sentiment < -0.3', condition: 'sentiment_threshold', weight: 0.5 },
+                { from: 'agent2', to: 'end', label: 'questions >= 6', condition: 'question_count >= 6', weight: 1.0 },
+                { from: 'agent3', to: 'agent1', label: 'resolved', condition: 'sentiment >= 0', weight: 0.6 },
+            ];
+
+            return (
+                <div>
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900">Agent Configuration & Orchestration</h2>
+                            <p className="text-sm text-gray-600 mt-1">{agents.length} agents configured with multi-agent flow</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setView('list')} className={`px-4 py-2 rounded-card font-medium text-sm ${view === 'list' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📋 Agent List</button>
+                            <button onClick={() => setView('flow')} className={`px-4 py-2 rounded-card font-medium text-sm ${view === 'flow' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>🔀 Flow Designer</button>
+                            <button onClick={() => setView('weights')} className={`px-4 py-2 rounded-card font-medium text-sm ${view === 'weights' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>⚖️ Weights</button>
+                        </div>
+                    </div>
+
+                    {view === 'list' && (
+                        <div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                {agents.map(agent => (
+                                    <div key={agent.id} onClick={() => setSelectedAgent(selectedAgent?.id === agent.id ? null : agent)} className={`bg-white border-2 rounded-card p-5 cursor-pointer transition hover-shadow ${selectedAgent?.id === agent.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}`}>
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: agent.color }}>{agent.name.charAt(0)}</div>
+                                                <div>
+                                                    <h3 className="font-semibold text-gray-900">{agent.name}</h3>
+                                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${agent.priority === 'primary' ? 'badge-success' : agent.priority === 'secondary' ? 'badge-blue' : 'badge-warning'}`}>{agent.priority}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between"><span className="text-gray-600">Archetype:</span><span className="font-medium text-gray-900">{agent.archetype}</span></div>
+                                            <div className="flex justify-between"><span className="text-gray-600">Weight:</span><span className="font-medium text-gray-900">{(agent.weight * 100).toFixed(0)}%</span></div>
+                                            <div className="flex justify-between"><span className="text-gray-600">Topics:</span><span className="font-medium text-gray-900">{agent.topics.join(', ')}</span></div>
+                                            <div className="flex justify-between"><span className="text-gray-600">Max Q before handoff:</span><span className="font-medium text-gray-900">{agent.maxBeforeHandoff || 'N/A'}</span></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={() => setShowAddAgent(!showAddAgent)} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-card font-medium hover:bg-blue-100 mb-6">➕ Add Agent</button>
+
+                            {showAddAgent && (
+                                <div className="bg-gray-50 rounded-card p-6 mb-6 border border-gray-200">
+                                    <h3 className="font-semibold text-gray-900 mb-4">New Agent</h3>
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Agent Name</label><input type="text" placeholder="e.g., Technical Interviewer" className="w-full px-3 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Archetype</label><select className="w-full px-3 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500"><option>Exploratory</option><option>Technical</option><option>Empathetic</option><option>Challenging</option><option>Observer</option><option>Custom</option></select></div>
+                                    </div>
+                                    <div className="mb-4"><label className="block text-sm font-medium text-gray-700 mb-1">System Prompt</label><textarea rows={4} placeholder="Define the agent's personality, expertise, and interview style..." className="w-full px-3 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea></div>
+                                    <div className="grid grid-cols-3 gap-4 mb-4">
+                                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Priority</label><select className="w-full px-3 py-2 border border-gray-300 rounded-card"><option>Primary</option><option>Secondary</option><option>Observer</option></select></div>
+                                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Topic Tags</label><input type="text" placeholder="e.g., technical, process" className="w-full px-3 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Max Questions</label><input type="number" defaultValue={8} min={1} max={20} className="w-full px-3 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                    </div>
+                                    <div className="flex gap-2"><button className="px-4 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700 text-sm">Save Agent</button><button onClick={() => setShowAddAgent(false)} className="px-4 py-2 border border-gray-300 rounded-card font-medium hover:bg-gray-50 text-sm">Cancel</button></div>
+                                </div>
+                            )}
+
+                            {selectedAgent && (
+                                <div className="bg-white border border-gray-200 rounded-card p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-bold text-gray-900">Agent Prompt Editor — {selectedAgent.name}</h3>
+                                        <div className="flex gap-2">
+                                            <button className="px-3 py-1 text-sm border border-gray-300 rounded-card hover:bg-gray-50">📋 Duplicate</button>
+                                            <button className="px-3 py-1 text-sm border border-gray-300 rounded-card hover:bg-gray-50">🔄 Version History</button>
+                                            <button className="px-3 py-1 text-sm border border-red-300 text-red-600 rounded-card hover:bg-red-50">🗑 Delete</button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-6">
+                                        <div className="col-span-2">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">System Prompt</label>
+                                            <textarea rows={6} defaultValue={selectedAgent.prompt} className="w-full px-4 py-3 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                                            <div className="flex items-center gap-4 mt-3">
+                                                <button className="px-3 py-1 bg-blue-50 text-blue-600 rounded-card text-sm font-medium hover:bg-blue-100">🤖 Improve with AI</button>
+                                                <span className="text-xs text-gray-500">v3 — Last edited 2 hours ago</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-card p-4">
+                                            <h4 className="font-semibold text-gray-900 mb-3 text-sm">Agent Properties</h4>
+                                            <div className="space-y-3 text-sm">
+                                                <div><label className="block text-xs font-medium text-gray-600 mb-1">Temperature</label><input type="range" min="0" max="100" defaultValue="70" className="w-full" /><span className="text-xs text-gray-500">0.7</span></div>
+                                                <div><label className="block text-xs font-medium text-gray-600 mb-1">Max Tokens</label><input type="number" defaultValue={512} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" /></div>
+                                                <div><label className="block text-xs font-medium text-gray-600 mb-1">Probing Depth</label><select className="w-full px-2 py-1 border border-gray-300 rounded text-sm"><option>1 - Surface</option><option>2 - Moderate</option><option selected>3 - Deep</option><option>4 - Very Deep</option><option>5 - Maximum</option></select></div>
+                                                <div><label className="block text-xs font-medium text-gray-600 mb-1">Follow-up Style</label><select className="w-full px-2 py-1 border border-gray-300 rounded text-sm"><option>Conversational</option><option selected>Probing</option><option>Challenging</option><option>Empathetic</option></select></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {view === 'flow' && (
+                        <div>
+                            <div className="flex items-center gap-3 mb-4">
+                                <button className="px-3 py-1 text-sm bg-green-50 text-green-600 rounded-card font-medium hover:bg-green-100">✓ Validate Flow</button>
+                                <button className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded-card font-medium hover:bg-blue-100">⟳ Auto-Layout</button>
+                                <button className="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-card font-medium hover:bg-gray-200">↩ Undo</button>
+                                <button className="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-card font-medium hover:bg-gray-200">↪ Redo</button>
+                                <div className="flex-1"></div>
+                                <span className="text-xs text-gray-500">Zoom: 100%</span>
+                                <button className="px-2 py-1 text-sm bg-gray-100 rounded-card">−</button>
+                                <button className="px-2 py-1 text-sm bg-gray-100 rounded-card">+</button>
+                            </div>
+                            <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-card relative" style={{ height: '360px', backgroundImage: 'radial-gradient(circle, #ddd 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+                                {flowNodes.map(node => (
+                                    <div key={node.id} className="absolute cursor-move" style={{ left: node.x, top: node.y, transform: 'translate(-50%, -50%)' }}>
+                                        {node.type === 'start' && <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-lg border-2 border-green-600">START</div>}
+                                        {node.type === 'end' && <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-lg border-2 border-red-600">END</div>}
+                                        {node.type === 'agent' && (
+                                            <div className="bg-white rounded-card shadow-lg border-2 px-4 py-3 text-center min-w-max" style={{ borderColor: node.color }}>
+                                                <div className="w-8 h-8 rounded-full mx-auto mb-1 flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: node.color }}>{node.label.charAt(0)}</div>
+                                                <p className="text-xs font-semibold text-gray-900">{node.label}</p>
+                                                <p className="text-xs text-gray-500">{agents.find(a => a.id === node.agentId)?.priority}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+
+                                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
+                                    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#6B7280" /></marker></defs>
+                                    <line x1="95" y1="150" x2="190" y2="100" stroke="#6B7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                                    <line x1="310" y1="80" x2="430" y2="80" stroke="#6B7280" strokeWidth="2" markerEnd="url(#arrowhead)" strokeDasharray="6,3" />
+                                    <line x1="270" y1="110" x2="340" y2="210" stroke="#F59E0B" strokeWidth="2" markerEnd="url(#arrowhead)" strokeDasharray="6,3" />
+                                    <line x1="550" y1="100" x2="630" y2="140" stroke="#6B7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                                    <line x1="340" y1="240" x2="250" y2="120" stroke="#F59E0B" strokeWidth="1.5" markerEnd="url(#arrowhead)" strokeDasharray="4,4" />
+                                </svg>
+
+                                <div className="absolute text-xs bg-white px-2 py-0.5 rounded border border-gray-300 shadow-sm" style={{ left: 130, top: 110 }}>Entry</div>
+                                <div className="absolute text-xs bg-white px-2 py-0.5 rounded border border-gray-300 shadow-sm" style={{ left: 350, top: 58 }}>coverage ≥ 80%</div>
+                                <div className="absolute text-xs bg-yellow-50 px-2 py-0.5 rounded border border-yellow-300 shadow-sm" style={{ left: 270, top: 165 }}>sentiment &lt; -0.3</div>
+                                <div className="absolute text-xs bg-white px-2 py-0.5 rounded border border-gray-300 shadow-sm" style={{ left: 570, top: 108 }}>Q ≥ 6</div>
+                                <div className="absolute text-xs bg-yellow-50 px-2 py-0.5 rounded border border-yellow-300 shadow-sm" style={{ left: 255, top: 195 }}>resolved</div>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-2 gap-4">
+                                <div className="bg-white border border-gray-200 rounded-card p-4">
+                                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Transition Editor</h4>
+                                    <p className="text-xs text-gray-500 mb-3">Click an edge on the canvas to edit, or drag between nodes to create new transitions</p>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex gap-2 items-center"><span className="text-gray-600 w-20">From:</span><select className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"><option>Discovery Agent</option><option>Technical Deep-Dive</option></select></div>
+                                        <div className="flex gap-2 items-center"><span className="text-gray-600 w-20">To:</span><select className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"><option>Technical Deep-Dive</option><option>End</option></select></div>
+                                        <div className="flex gap-2 items-center"><span className="text-gray-600 w-20">Trigger:</span><select className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"><option>topic_coverage ≥ threshold</option><option>sentiment threshold</option><option>keyword match</option><option>question_count ≥ N</option><option>time_elapsed ≥ N min</option></select></div>
+                                        <div className="flex gap-2 items-center"><span className="text-gray-600 w-20">Value:</span><input type="text" defaultValue="80%" className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm" /></div>
+                                        <div className="flex gap-2 items-center"><span className="text-gray-600 w-20">Weight:</span><input type="range" min="0" max="100" defaultValue="80" className="flex-1" /><span className="text-xs text-gray-500 w-8">0.8</span></div>
+                                        <div><span className="text-gray-600">Handoff message:</span><input type="text" placeholder="Optional: 'Now let's explore the technical side...'" className="w-full mt-1 px-2 py-1 border border-gray-300 rounded text-sm" /></div>
+                                    </div>
+                                </div>
+                                <div className="bg-white border border-gray-200 rounded-card p-4">
+                                    <h4 className="font-semibold text-gray-900 mb-3 text-sm">Flow Validation</h4>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex items-center gap-2"><span className="text-green-500">✓</span><span className="text-gray-700">All agents reachable from Start</span></div>
+                                        <div className="flex items-center gap-2"><span className="text-green-500">✓</span><span className="text-gray-700">End node reachable from all agents</span></div>
+                                        <div className="flex items-center gap-2"><span className="text-green-500">✓</span><span className="text-gray-700">No orphan nodes</span></div>
+                                        <div className="flex items-center gap-2"><span className="text-yellow-500">⚠</span><span className="text-yellow-700">Circular path: Discovery → Sentiment Observer → Discovery (max-iterations=5)</span></div>
+                                        <div className="flex items-center gap-2"><span className="text-green-500">✓</span><span className="text-gray-700">All transitions have conditions</span></div>
+                                    </div>
+                                    <div className="mt-4 pt-3 border-t">
+                                        <h4 className="font-semibold text-gray-900 mb-2 text-sm">Flow Settings</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex gap-2 items-center"><span className="text-gray-600 text-xs">Max loop iterations:</span><input type="number" defaultValue={5} min={1} max={20} className="w-16 px-2 py-1 border border-gray-300 rounded text-sm" /></div>
+                                            <div className="flex gap-2 items-center"><span className="text-gray-600 text-xs">Conflict resolution:</span><select className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"><option>Highest weight wins</option><option>First match wins</option><option>Random weighted</option></select></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'weights' && (
+                        <div>
+                            <div className="bg-blue-50 rounded-card p-4 mb-6 border border-blue-200">
+                                <div className="flex items-center justify-between">
+                                    <div><p className="text-sm font-medium text-blue-900">Agent weights must sum to 100%</p><p className="text-xs text-blue-700 mt-1">Current total: 100% (balanced)</p></div>
+                                    <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded-card font-medium hover:bg-blue-700">⚖️ Auto-Normalize</button>
+                                </div>
+                            </div>
+                            <div className="space-y-6">
+                                {agents.map(agent => (
+                                    <div key={agent.id} className="bg-white border border-gray-200 rounded-card p-6">
+                                        <div className="flex items-center gap-4 mb-4">
+                                            <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: agent.color }}>{agent.name.charAt(0)}</div>
+                                            <div className="flex-1">
+                                                <h3 className="font-semibold text-gray-900">{agent.name}</h3>
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${agent.priority === 'primary' ? 'badge-success' : agent.priority === 'secondary' ? 'badge-blue' : 'badge-warning'}`}>{agent.priority}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-3xl font-bold text-gray-900">{(agent.weight * 100).toFixed(0)}%</p>
+                                                <p className="text-xs text-gray-500">weight</p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">Weight (0-100%)</label>
+                                                <input type="range" min="0" max="100" defaultValue={agent.weight * 100} className="w-full" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">Response Priority</label>
+                                                <select className="w-full px-2 py-1 border border-gray-300 rounded text-sm" defaultValue={agent.priority}><option value="primary">Primary</option><option value="secondary">Secondary</option><option value="observer">Observer</option></select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">Topic Ownership</label>
+                                                <div className="flex gap-1 flex-wrap">
+                                                    {agent.topics.map((topic, i) => (
+                                                        <span key={i} className="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs">{topic} ✕</span>
+                                                    ))}
+                                                    <button className="inline-block px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs hover:bg-blue-100">+ Add</button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">Max Questions Before Handoff</label>
+                                                <input type="number" defaultValue={agent.maxBeforeHandoff} min={0} max={20} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                                            </div>
+                                        </div>
+                                        {agent.priority === 'observer' && (
+                                            <div className="mt-3 bg-yellow-50 rounded p-3 border border-yellow-200">
+                                                <p className="text-xs text-yellow-800"><strong>Observer mode:</strong> Receives full conversation context. Only interjects when topic triggers activate. Does not count against question rotation.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function TeamManagement() {
+            return (
+                <div className="p-8">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-8">Team Management</h1>
+                    <div className="grid grid-cols-3 gap-8">
+                        <div className="col-span-2">
+                            <div className="bg-white rounded-card card-shadow overflow-hidden">
+                                <div className="p-6 border-b border-gray-200"><h2 className="text-lg font-semibold text-gray-900">Team Members</h2></div>
+                                <table className="w-full">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="text-left py-3 px-6 font-semibold text-gray-600 text-sm">Name</th>
+                                            <th className="text-left py-3 px-6 font-semibold text-gray-600 text-sm">Email</th>
+                                            <th className="text-left py-3 px-6 font-semibold text-gray-600 text-sm">Role</th>
+                                            <th className="text-left py-3 px-6 font-semibold text-gray-600 text-sm">Last Active</th>
+                                            <th className="text-left py-3 px-6 font-semibold text-gray-600 text-sm">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {teamMembers.map((member) => (
+                                            <tr key={member.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                                <td className="py-4 px-6 font-medium text-gray-900">{member.name}</td>
+                                                <td className="py-4 px-6 text-gray-700">{member.email}</td>
+                                                <td className="py-4 px-6"><select className="px-3 py-1 border border-gray-300 rounded-card text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" defaultValue={member.role}><option>Admin</option><option>Designer</option><option>Analyst</option><option>Viewer</option></select></td>
+                                                <td className="py-4 px-6 text-gray-700 text-sm">{member.lastActive}</td>
+                                                <td className="py-4 px-6"><span className={`inline-block w-2 h-2 rounded-full mr-2 ${member.status === 'online' ? 'bg-green-500' : member.status === 'idle' ? 'bg-yellow-500' : 'bg-gray-400'}`}></span><span className="text-sm text-gray-600 capitalize">{member.status}</span></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div>
+                            <div className="bg-white rounded-card card-shadow p-6 mb-6"><h3 className="font-semibold text-gray-900 mb-4">Invite Member</h3><div className="space-y-4"><input type="email" placeholder="email@company.de" className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" /><select className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500"><option>Admin</option><option>Designer</option><option>Analyst</option></select><button className="w-full px-4 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700">Send Invite</button></div></div>
+                            <div className="bg-blue-50 rounded-card p-6 border border-blue-200"><h3 className="font-semibold text-blue-900 mb-3">Role Descriptions</h3><ul className="text-xs text-blue-900 space-y-2"><li><strong>Admin:</strong> Full access</li><li><strong>Designer:</strong> Create & edit</li><li><strong>Analyst:</strong> View & analyze</li><li><strong>Viewer:</strong> View only</li></ul></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function TemplatesLibrary() {
+            const [selectedCategory, setSelectedCategory] = useState('All');
+            const categories = ['All', 'AI Readiness', 'Requirements', 'HR', 'Compliance', 'Custom'];
+            const filteredTemplates = selectedCategory === 'All' ? templates : templates.filter(t => t.category === selectedCategory);
+
+            return (
+                <div className="p-8">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-8">Templates Library</h1>
+                    <div className="flex gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide">
+                        {categories.map((cat) => (
+                            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-card font-medium text-sm whitespace-nowrap transition ${selectedCategory === cat ? 'bg-primary-blue text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredTemplates.map((template) => (
+                            <div key={template.id} className="bg-white rounded-card card-shadow p-6 hover-shadow cursor-pointer transition">
+                                <div className="flex items-start justify-between mb-3">
+                                    <h3 className="font-semibold text-gray-900 flex-1">{template.name}</h3>
+                                    <span className="badge-blue px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ml-2">{template.category}</span>
+                                </div>
+                                <p className="text-sm text-gray-600 mb-4 line-clamp-2">{template.description}</p>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-500">{template.questions} questions</span>
+                                    <button className="px-4 py-2 bg-blue-100 text-blue-600 rounded-card font-medium text-sm hover:bg-blue-200">Use Template</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function SettingsPage({ settingsTab, setSettingsTab, userName }) {
+            const tabs = ['profile', 'organization', 'authentication', 'data&privacy', 'billing', 'notifications'];
+            const tabLabels = { profile: 'Profile', organization: 'Organization', authentication: 'Authentication', 'data&privacy': 'Data & Privacy', billing: 'Billing', notifications: 'Notifications' };
+
+            return (
+                <div className="p-8">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
+                    <div className="flex gap-8">
+                        <div className="w-48">
+                            <div className="bg-white rounded-card card-shadow overflow-hidden">
+                                {tabs.map((tabName) => (
+                                    <button key={tabName} onClick={() => setSettingsTab(tabName)} className={`w-full text-left px-6 py-4 border-l-4 transition ${settingsTab === tabName ? 'border-blue-600 bg-blue-50 text-blue-600 font-medium' : 'border-transparent text-gray-700 hover:bg-gray-50'}`}>
+                                        {tabLabels[tabName]}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex-1">
+                            <div className="bg-white rounded-card card-shadow p-8">
+                                {settingsTab === 'profile' && (
+                                    <div className="space-y-6">
+                                        <h2 className="text-2xl font-bold text-gray-900">Profile</h2>
+                                        <div className="space-y-4 max-w-md">
+                                            <div><label className="block text-sm font-medium text-gray-700 mb-2">Name</label><input type="text" defaultValue={userName} className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                            <div><label className="block text-sm font-medium text-gray-700 mb-2">Email</label><input type="email" defaultValue={`${userName}@company.de`} className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                            <div><label className="block text-sm font-medium text-gray-700 mb-2">Language</label><select className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500"><option>English</option><option>Deutsch</option></select></div>
+                                            <button className="w-full px-4 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700">Save Changes</button>
+                                        </div>
+                                    </div>
+                                )}
+                                {settingsTab === 'organization' && (
+                                    <div className="space-y-6">
+                                        <h2 className="text-2xl font-bold text-gray-900">Organization</h2>
+                                        <div className="space-y-4 max-w-md">
+                                            <div><label className="block text-sm font-medium text-gray-700 mb-2">Organization Name</label><input type="text" defaultValue="TechCorp GmbH" className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                            <button className="w-full px-4 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700">Save Changes</button>
+                                        </div>
+                                    </div>
+                                )}
+                                {settingsTab === 'authentication' && (
+                                    <div className="space-y-6">
+                                        <h2 className="text-2xl font-bold text-gray-900">Authentication</h2>
+                                        <div className="space-y-4 max-w-md">
+                                            <div><label className="block text-sm font-medium text-gray-700 mb-2">SSO Provider</label><select className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500"><option>Azure AD</option><option>Okta</option><option>SAML</option></select></div>
+                                            <button className="w-full px-4 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700">Save Changes</button>
+                                        </div>
+                                    </div>
+                                )}
+                                {settingsTab === 'data&privacy' && (
+                                    <div className="space-y-6">
+                                        <h2 className="text-2xl font-bold text-gray-900">Data & Privacy</h2>
+                                        <div className="space-y-4 max-w-md">
+                                            <div><label className="block text-sm font-medium text-gray-700 mb-2">Data Retention</label><select className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500"><option>30 days</option><option>90 days</option><option>180 days</option></select></div>
+                                            <button className="w-full px-4 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700">Save Changes</button>
+                                        </div>
+                                    </div>
+                                )}
+                                {settingsTab === 'billing' && (
+                                    <div className="space-y-6">
+                                        <h2 className="text-2xl font-bold text-gray-900">Billing</h2>
+                                        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-card p-8 text-white"><p className="opacity-90 mb-2">Current Plan</p><p className="text-3xl font-bold mb-4">Professional</p><p className="text-sm opacity-75">€99/month</p></div>
+                                        <button className="px-6 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700">Upgrade Plan</button>
+                                    </div>
+                                )}
+                                {settingsTab === 'notifications' && (
+                                    <div className="space-y-6">
+                                        <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>
+                                        <div className="space-y-4 max-w-md">
+                                            {[{id: 'completed', label: 'Interview completed'}, {id: 'ready', label: 'Analysis ready'}, {id: 'budget', label: 'Budget alert'}].map(item => (
+                                                <label key={item.id} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" defaultChecked className="cursor-pointer" /><span className="text-sm font-medium">{item.label}</span></label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function IntervieweeFlow({ flow, setFlow, onBack }) {
+            if (flow.step === 'landing') return <IntervieweeLanding onContinue={() => setFlow({ step: 'consent' })} onBack={onBack} />;
+            if (flow.step === 'consent') return <IntervieweeConsent onContinue={() => setFlow({ step: 'chat' })} onBack={() => setFlow({ step: 'landing' })} />;
+            if (flow.step === 'chat') return <IntervieweeChat onComplete={() => setFlow({ step: 'complete' })} onPause={() => setFlow({ step: 'paused' })} />;
+            if (flow.step === 'paused') return <IntervieweePaused onResume={() => setFlow({ step: 'chat' })} onExit={onBack} />;
+            if (flow.step === 'complete') return <IntervieweeCompletion onClose={onBack} />;
+        }
+
+        function IntervieweeLanding({ onContinue, onBack }) {
+            return (
+                <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
+                    <button onClick={onBack} className="absolute top-4 left-4 px-4 py-2 text-sm border border-gray-300 rounded-card hover:bg-gray-50 font-medium">← Back to Admin</button>
+                    <div className="text-center max-w-md">
+                        <div className="text-5xl mb-6">🎤</div>
+                        <h1 className="text-4xl font-bold text-gray-900 mb-4">AI Readiness Assessment 2024</h1>
+                        <p className="text-lg text-gray-700 mb-6">Help us understand your organization's AI maturity.</p>
+                        <p className="text-sm text-gray-600 mb-6"><strong>Estimated duration:</strong> ~15 minutes</p>
+                        <button onClick={onContinue} className="w-full px-6 py-4 bg-primary-blue text-white rounded-card font-semibold hover:bg-blue-700 text-lg mb-4">Begin Interview</button>
+                        <p className="text-xs text-gray-500">Powered by IaaS</p>
+                    </div>
+                </div>
+            );
+        }
+
+        function IntervieweeConsent({ onContinue, onBack }) {
+            const [consents, setConsents] = useState({ recording: false, storage: false, withdraw: false });
+            const allChecked = consents.recording && consents.storage && consents.withdraw;
+
+            return (
+                <div className="min-h-screen bg-white flex items-center justify-center p-4">
+                    <button onClick={onBack} className="absolute top-4 left-4 px-4 py-2 text-sm border border-gray-300 rounded-card hover:bg-gray-50 font-medium">← Back</button>
+                    <div className="max-w-md w-full">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-6">Privacy & Consent</h1>
+                        <div className="bg-gray-50 rounded-card p-6 h-48 overflow-y-auto mb-6">
+                            <p className="text-sm text-gray-700 mb-4">Your privacy is important. This interview collects information about your organization's AI capabilities. All responses are confidential.</p>
+                            <p className="text-sm text-gray-700">Your data will be stored securely for 90 days, then automatically deleted.</p>
+                        </div>
+                        <div className="space-y-4 mb-6">
+                            {[{id: 'recording', label: 'I consent to my responses being recorded'}, {id: 'storage', label: 'I understand my data will be stored for 90 days'}, {id: 'withdraw', label: 'I can withdraw at any time'}].map(item => (
+                                <label key={item.id} className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={consents[item.id]} onChange={(e) => setConsents({...consents, [item.id]: e.target.checked})} className="mt-1 cursor-pointer" /><span className="text-sm text-gray-700">{item.label}</span></label>
+                            ))}
+                        </div>
+                        <button onClick={onContinue} disabled={!allChecked} className={`w-full px-6 py-3 rounded-card font-semibold text-lg mb-4 transition ${allChecked ? 'bg-primary-blue text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>Continue</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function IntervieweeChat({ onComplete, onPause }) {
+            const [messages, setMessages] = useState([
+                { role: 'agent', text: 'Hello! Thank you for participating. What is your current role?' },
+                { role: 'user', text: 'I\'m the Head of Digital Transformation.' },
+                { role: 'agent', text: 'What are the main barriers to AI adoption?' },
+            ]);
+            const [inputValue, setInputValue] = useState('');
+
+            const handleSend = () => {
+                if (inputValue.trim()) {
+                    setMessages([...messages, { role: 'user', text: inputValue }]);
+                    setInputValue('');
+                }
+            };
+
+            return (
+                <div className="h-screen bg-white flex flex-col">
+                    <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">A</div>
+                            <div><p className="font-semibold text-gray-900">Alex (AI Agent)</p><p className="text-xs text-gray-500">Active</p></div>
+                        </div>
+                        <button onClick={onPause} className="px-3 py-1 text-sm border border-gray-300 rounded-card hover:bg-gray-50 font-medium">⏸ Pause</button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                        {messages.map((msg, i) => (
+                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-xs rounded-card p-4 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-agent'}`}>
+                                    <p className="text-sm">{msg.text}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="border-t border-gray-200 p-4 bg-gray-50">
+                        <p className="text-xs text-gray-600 mb-2">Question 2 of 8</p>
+                        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden"><div className="h-full bg-blue-500" style={{ width: '25%' }}></div></div>
+                    </div>
+                    <div className="bg-white border-t border-gray-200 p-4">
+                        <div className="flex gap-2 mb-4">
+                            <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder="Type response..." className="flex-1 px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <button onClick={handleSend} className="px-6 py-2 bg-primary-blue text-white rounded-card font-medium hover:bg-blue-700">Send</button>
+                        </div>
+                        <button onClick={onComplete} className="px-4 py-2 text-sm border border-gray-300 rounded-card hover:bg-gray-50 font-medium">Mark Complete</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function IntervieweePaused({ onResume, onExit }) {
+            return (
+                <div className="h-screen bg-white flex items-center justify-center p-4">
+                    <div className="text-center max-w-md">
+                        <p className="text-4xl mb-6">⏸</p>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-4">Interview Paused</h1>
+                        <p className="text-gray-700 mb-8">Return anytime using the same link.</p>
+                        <button onClick={onResume} className="w-full px-6 py-3 bg-primary-blue text-white rounded-card font-semibold hover:bg-blue-700 mb-4">Resume Interview</button>
+                        <button onClick={onExit} className="w-full text-gray-600 text-sm hover:text-gray-900">Exit Interview</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function IntervieweeCompletion({ onClose }) {
+            return (
+                <div className="h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
+                    <div className="text-center max-w-md">
+                        <div className="text-6xl mb-6">✅</div>
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">Thank You!</h1>
+                        <p className="text-lg text-gray-700 mb-8">Your responses have been recorded securely.</p>
+                        <div className="bg-blue-50 rounded-card p-6 mb-8 text-left">
+                            <label className="block text-sm font-medium text-gray-900 mb-2">Any additional thoughts?</label>
+                            <textarea placeholder="Optional..." rows={4} className="w-full px-4 py-2 border border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"></textarea>
+                            <button className="w-full px-4 py-2 bg-blue-100 text-blue-600 rounded-card font-medium hover:bg-blue-200 mb-6">Submit Feedback</button>
+                            <label className="block text-sm font-medium text-gray-900 mb-3">Experience rating</label>
+                            <div className="flex justify-center gap-2">{[1,2,3,4,5].map(i => <button key={i} className="text-3xl hover:scale-110 transition cursor-pointer">⭐</button>)}</div>
+                        </div>
+                        <button onClick={onClose} className="w-full px-6 py-3 bg-primary-blue text-white rounded-card font-semibold hover:bg-blue-700">Close</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function StatusBadge({ status }) {
+            const colors = { active: 'badge-success', testing: 'badge-warning', draft: 'badge-gray', completed: 'badge-blue', archived: 'badge-red' };
+            const labels = { active: '🟢 Active', testing: '🟡 Testing', draft: '⚪ Draft', completed: '🔵 Completed', archived: '⚫ Archived' };
+            return <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${colors[status] || colors.draft}`}>{labels[status] || 'Unknown'}</span>;
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

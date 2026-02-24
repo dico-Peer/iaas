@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICONIUM | THE ARCHITECT'S MANDATE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050505;
+            --text-color: #ffffff;
+            --accent-color: #00ff41; /* Cyber Lime */
+            --dim-color: #444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Space Grotesk', sans-serif;
+            overflow-x: hidden;
+            line-height: 1.2;
+        }
+
+        /* Scanline Overlay Effect */
+        body::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 9999;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        header {
+            padding: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--dim-color);
+        }
+
+        .logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 1.5rem;
+            letter-spacing: -1px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+
+        section {
+            padding: 10vh 2rem;
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Hero Glitch Section */
+        .hero h1 {
+            font-size: clamp(3rem, 15vw, 12rem);
+            font-weight: 700;
+            text-transform: uppercase;
+            line-height: 0.85;
+            letter-spacing: -0.05em;
+            margin-bottom: 2rem;
+        }
+
+        .glitch-text {
+            position: relative;
+            color: white;
+        }
+
+        .hero p {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            max-width: 600px;
+            color: var(--dim-color);
+        }
+
+        .vision-mission-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            border-top: 1px solid var(--dim-color);
+            margin-top: 4rem;
+        }
+
+        .card {
+            padding: 2rem;
+            border-left: 1px solid var(--dim-color);
+        }
+
+        .card h2 {
+            color: var(--accent-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+        }
+
+        .card p {
+            font-size: 2rem;
+            font-weight: 300;
+        }
+
+        /* Table Section */
+        .comparison {
+            background-color: #111;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--dim-color);
+        }
+
+        th {
+            text-transform: uppercase;
+            color: var(--dim-color);
+            font-size: 0.8rem;
+        }
+
+        .vs-col {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        .cta-btn {
+            background: var(--accent-color);
+            color: black;
+            padding: 1.5rem 3rem;
+            text-decoration: none;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 2rem;
+            transition: transform 0.2s;
+            text-transform: uppercase;
+        }
+
+        .cta-btn:hover {
+            transform: skew(-10deg);
+        }
+
+        footer {
+            padding: 2rem;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--dim-color);
+        }
+
+        @media (max-width: 768px) {
+            .vision-mission-grid { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 4rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">DICONIUM_SYS_v2026</div>
+        <div><span class="status-dot"></span> <span style="font-family: 'JetBrains Mono'; font-size: 0.8rem;">SYSTEM_ONLINE</span></div>
+    </header>
+
+    <section class="hero">
+        <h1 class="glitch-text">ANALOG<br>IS DEAD.</h1>
+        <p>// We don't digitize processes. We engineer digital supremacy for the titans of industry. Welcome to the engine room of the future.</p>
+        <a href="#" class="cta-btn">Initiate Evolution</a>
+    </section>
+
+    <section>
+        <div class="vision-mission-grid">
+            <div class="card">
+                <h2>The Vision</h2>
+                <p>To architect the definitive OS of reality, where every physical atom is governed by digital intelligence.</p>
+            </div>
+            <div class="card">
+                <h2>The Mission</h2>
+                <p>Annihilate analog friction. Forge digital empires. Build the code that renders competition obsolete.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="comparison">
+        <h2 style="margin-bottom: 3rem; font-family: 'JetBrains Mono'; color: var(--accent-color);">[COMPETITIVE_ANALYSIS]</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>The Legacy Consultant</th>
+                    <th></th>
+                    <th>Diconium</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Strategy PowerPoints</td>
+                    <td class="vs-col">VS</td>
+                    <td>Production Grade Code</td>
+                </tr>
+                <tr>
+                    <td>"Digital Transformation"</td>
+                    <td class="vs-col">VS</td>
+                    <td>Digital Sovereignty</td>
+                </tr>
+                <tr>
+                    <td>Maintenance of the Past</td>
+                    <td class="vs-col">VS</td>
+                    <td>Architecting the Future</td>
+                </tr>
+                <tr>
+                    <td>Bureaucratic Friction</td>
+                    <td class="vs-col">VS</td>
+                    <td>Radical Execution</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <footer>
+        © 2026 DICONIUM DIGITAL SOVEREIGNTY UNIT // ALL RIGHTS RESERVED.
+    </footer>
+
+</body>
+</html>
