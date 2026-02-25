@@ -45,6 +45,7 @@ IaaS/
 - **US-1.03:** JWT Auth (register, login, refresh, protected endpoints) ✅
 - **US-1.04:** Organization & User Management (invite, accept-invite, list users) ✅
 - **US-1.05:** Application Shell & Navigation (sidebar, top bar, route guards) ✅
+- **US-2.01:** Interview Project CRUD (create, list, update, delete, clone) 🚧
 
 ## Publishing (Push & PR)
 

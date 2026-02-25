@@ -29,3 +29,13 @@ def get_current_org_admin(
     if role not in ("org_admin", "system_admin"):
         raise HTTPException(status_code=403, detail="Forbidden: org admin required")
     return current_user
+
+
+def get_current_designer_or_admin(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Require designer, org_admin, or system_admin. Used for project CRUD."""
+    role = current_user.get("role", "")
+    if role not in ("org_admin", "system_admin", "designer"):
+        raise HTTPException(status_code=403, detail="Forbidden: designer or admin required")
+    return current_user
