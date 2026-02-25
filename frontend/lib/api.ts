@@ -46,3 +46,100 @@ export async function createProject(
   if (!r.ok) throw new Error(`Failed to create project: ${r.status}`);
   return r.json();
 }
+
+export interface Question {
+  id: string;
+  order_index: number;
+  question_text: string;
+  question_type: string;
+  probing_depth: number;
+  help_text?: string | null;
+  options_json?: string[] | null;
+  scale_config?: Record<string, unknown> | null;
+  branching_rules?: unknown;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export async function fetchQuestions(
+  token: string,
+  projectId: string
+): Promise<{ questions: Question[] }> {
+  const r = await fetch(`${API_BASE}/api/v1/projects/${projectId}/questions`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error(`Failed to fetch questions: ${r.status}`);
+  return r.json();
+}
+
+export async function createQuestion(
+  token: string,
+  projectId: string,
+  data: { question_text: string; question_type?: string; probing_depth?: number; help_text?: string }
+): Promise<Question> {
+  const r = await fetch(`${API_BASE}/api/v1/projects/${projectId}/questions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error(`Failed to create question: ${r.status}`);
+  return r.json();
+}
+
+export async function updateQuestion(
+  token: string,
+  projectId: string,
+  questionId: string,
+  data: Partial<{
+    question_text: string;
+    question_type: string;
+    probing_depth: number;
+    help_text: string;
+    options_json: string[];
+    scale_config: Record<string, unknown>;
+  }>
+): Promise<Question> {
+  const r = await fetch(`${API_BASE}/api/v1/projects/${projectId}/questions/${questionId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error(`Failed to update question: ${r.status}`);
+  return r.json();
+}
+
+export async function reorderQuestions(
+  token: string,
+  projectId: string,
+  questionId: string,
+  newIndex: number
+): Promise<{ questions: Question[] }> {
+  const r = await fetch(`${API_BASE}/api/v1/projects/${projectId}/questions/reorder`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ question_id: questionId, new_index: newIndex }),
+  });
+  if (!r.ok) throw new Error(`Failed to reorder: ${r.status}`);
+  return r.json();
+}
+
+export async function deleteQuestion(
+  token: string,
+  projectId: string,
+  questionId: string
+): Promise<void> {
+  const r = await fetch(`${API_BASE}/api/v1/projects/${projectId}/questions/${questionId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error(`Failed to delete question: ${r.status}`);
+}

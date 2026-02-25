@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "@/lib/store";
 import { fetchProjects, type Project } from "@/lib/api";
@@ -128,7 +129,11 @@ export default function ProjectsPage() {
               ) : (
                 projects.map((p) => (
                   <tr key={p.id}>
-                    <td className="px-4 py-3 font-medium">{p.title}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <Link href={`/projects/${p.id}`} className="text-blue-600 hover:underline">
+                        {p.title}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={p.status} />
                     </td>

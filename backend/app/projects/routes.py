@@ -6,7 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth.dependencies import get_current_designer_or_admin
 from app.database import get_connection
-from app.projects.schemas import CreateProjectRequest, UpdateProjectRequest
+from app.projects.schemas import (
+    CreateProjectRequest,
+    CreateQuestionRequest,
+    ReorderRequest,
+    UpdateProjectRequest,
+    UpdateQuestionRequest,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -291,8 +297,8 @@ def clone_project(
                 ),
             )
             cur.execute(
-                """INSERT INTO interview_questions (id, project_id, order_index, question_text, question_type, probing_depth, branching_rules)
-                   SELECT gen_random_uuid(), %s, order_index, question_text, question_type, probing_depth, branching_rules
+                """INSERT INTO interview_questions (id, project_id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules)
+                   SELECT gen_random_uuid(), %s, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules
                    FROM interview_questions WHERE project_id = %s""",
                 (new_id, project_id),
             )
@@ -309,3 +315,233 @@ def clone_project(
             )
             new_row = cur.fetchone()
     return _project_row_to_dict(new_row)
+
+
+def _ensure_project_org(project_id: str, org_id: str) -> None:
+    """Raise 404 if project not found or not in org."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM interview_projects WHERE id = %s AND org_id = %s AND deleted_at IS NULL",
+                (project_id, org_id),
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Project not found")
+
+
+def _question_row_to_dict(row):
+    raw_opts = row.get("options_json")
+    opts = raw_opts if isinstance(raw_opts, list) else (raw_opts or [])
+    raw_scale = row.get("scale_config")
+    scale = raw_scale if isinstance(raw_scale, dict) else (raw_scale or {})
+    return {
+        "id": str(row["id"]),
+        "order_index": row["order_index"],
+        "question_text": row["question_text"],
+        "question_type": row["question_type"],
+        "probing_depth": row["probing_depth"],
+        "help_text": row.get("help_text"),
+        "options_json": opts if opts else None,
+        "scale_config": scale if scale else None,
+        "branching_rules": row.get("branching_rules"),
+        "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
+        "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
+    }
+
+
+@router.get("/{project_id}/questions")
+def list_questions(
+    project_id: str,
+    current_user: dict = Depends(get_current_designer_or_admin),
+):
+    """List questions for project. Ordered by order_index."""
+    org_id = current_user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    _ensure_project_org(project_id, org_id)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at
+                   FROM interview_questions WHERE project_id = %s ORDER BY order_index""",
+                (project_id,),
+            )
+            rows = cur.fetchall()
+    questions = [_question_row_to_dict(r) for r in rows]
+    return {"questions": questions}
+
+
+@router.post("/{project_id}/questions", status_code=201)
+def create_question(
+    project_id: str,
+    req: CreateQuestionRequest,
+    current_user: dict = Depends(get_current_designer_or_admin),
+):
+    """Create question. Appends to end."""
+    org_id = current_user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    _ensure_project_org(project_id, org_id)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(MAX(order_index), -1) + 1 AS next_idx FROM interview_questions WHERE project_id = %s",
+                (project_id,),
+            )
+            next_idx = cur.fetchone()["next_idx"]
+            cur.execute(
+                """INSERT INTO interview_questions (project_id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                   RETURNING id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at""",
+                (
+                    project_id,
+                    next_idx,
+                    req.question_text,
+                    req.question_type,
+                    req.probing_depth,
+                    req.help_text,
+                    json.dumps(req.options_json) if req.options_json else None,
+                    json.dumps(req.scale_config) if req.scale_config else None,
+                ),
+            )
+            row = cur.fetchone()
+    return _question_row_to_dict(row)
+
+
+@router.patch("/{project_id}/questions/reorder")
+def reorder_questions(
+    project_id: str,
+    req: ReorderRequest,
+    current_user: dict = Depends(get_current_designer_or_admin),
+):
+    """Reorder question. Recalculates all order_index values."""
+    org_id = current_user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    _ensure_project_org(project_id, org_id)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, order_index FROM interview_questions WHERE project_id = %s ORDER BY order_index",
+                (project_id,),
+            )
+            rows = cur.fetchall()
+        q_ids = [str(r["id"]) for r in rows]
+        if req.question_id not in q_ids:
+            raise HTTPException(status_code=404, detail="Question not found")
+        old_idx = q_ids.index(req.question_id)
+        new_idx = min(req.new_index, len(q_ids) - 1)
+        if old_idx == new_idx:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at
+                       FROM interview_questions WHERE project_id = %s ORDER BY order_index""",
+                    (project_id,),
+                )
+                rows = cur.fetchall()
+            return {"questions": [_question_row_to_dict(r) for r in rows]}
+        q_ids.pop(old_idx)
+        q_ids.insert(new_idx, req.question_id)
+        with conn.cursor() as cur:
+            for i, qid in enumerate(q_ids):
+                cur.execute(
+                    "UPDATE interview_questions SET order_index = %s, updated_at = NOW() WHERE id = %s AND project_id = %s",
+                    (i, qid, project_id),
+                )
+            cur.execute(
+                """SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at
+                   FROM interview_questions WHERE project_id = %s ORDER BY order_index""",
+                (project_id,),
+            )
+            rows = cur.fetchall()
+    return {"questions": [_question_row_to_dict(row) for row in rows]}
+
+
+@router.patch("/{project_id}/questions/{question_id}")
+def update_question(
+    project_id: str,
+    question_id: str,
+    req: UpdateQuestionRequest,
+    current_user: dict = Depends(get_current_designer_or_admin),
+):
+    """Update question. Partial update."""
+    org_id = current_user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    _ensure_project_org(project_id, org_id)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at FROM interview_questions WHERE id = %s AND project_id = %s",
+                (question_id, project_id),
+            )
+            row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Question not found")
+        updates = []
+        params = []
+        if req.question_text is not None:
+            updates.append("question_text = %s")
+            params.append(req.question_text)
+        if req.question_type is not None:
+            updates.append("question_type = %s")
+            params.append(req.question_type)
+        if req.probing_depth is not None:
+            updates.append("probing_depth = %s")
+            params.append(req.probing_depth)
+        if req.help_text is not None:
+            updates.append("help_text = %s")
+            params.append(req.help_text)
+        if req.options_json is not None:
+            updates.append("options_json = %s")
+            params.append(json.dumps(req.options_json))
+        if req.scale_config is not None:
+            updates.append("scale_config = %s")
+            params.append(json.dumps(req.scale_config))
+        if not updates:
+            return _question_row_to_dict(row)
+        updates.append("updated_at = NOW()")
+        params.extend([question_id, project_id])
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE interview_questions SET {', '.join(updates)} WHERE id = %s AND project_id = %s",
+                params,
+            )
+            cur.execute(
+                "SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at FROM interview_questions WHERE id = %s",
+                (question_id,),
+            )
+            row = cur.fetchone()
+    return _question_row_to_dict(row)
+
+
+@router.delete("/{project_id}/questions/{question_id}", status_code=204)
+def delete_question(
+    project_id: str,
+    question_id: str,
+    current_user: dict = Depends(get_current_designer_or_admin),
+):
+    """Delete question. Reorders remaining questions."""
+    org_id = current_user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    _ensure_project_org(project_id, org_id)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM interview_questions WHERE id = %s AND project_id = %s",
+                (question_id, project_id),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Question not found")
+            cur.execute(
+                """SELECT id, order_index FROM interview_questions WHERE project_id = %s ORDER BY order_index""",
+                (project_id,),
+            )
+            rows = cur.fetchall()
+            for i, r in enumerate(rows):
+                cur.execute(
+                    "UPDATE interview_questions SET order_index = %s WHERE id = %s",
+                    (i, r["id"]),
+                )
+    return None
