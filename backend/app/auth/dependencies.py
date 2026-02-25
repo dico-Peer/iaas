@@ -19,3 +19,13 @@ def get_current_user(
     if not payload or payload.get("type") != "access":
         raise HTTPException(status_code=401, detail="Authentication required")
     return payload
+
+
+def get_current_org_admin(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Require org_admin or system_admin role. Returns 403 for others."""
+    role = current_user.get("role", "")
+    if role not in ("org_admin", "system_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden: org admin required")
+    return current_user

@@ -43,6 +43,7 @@ IaaS/
 - **US-1.01:** Monorepo Setup & CI/CD Pipeline ✅
 - **US-1.02:** PostgreSQL Database Schema & Migrations ✅
 - **US-1.03:** JWT Auth (register, login, refresh, protected endpoints) ✅
+- **US-1.04:** Organization & User Management (invite, accept-invite, list users) ✅
 
 ## Publishing (Push & PR)
 
