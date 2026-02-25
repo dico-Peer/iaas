@@ -1,8 +1,20 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useAuthStore } from "@/lib/store";
+
 export default function Home() {
-  return (
-    <main>
-      <h1>IaaS</h1>
-      <p>Interviewer As a Service</p>
-    </main>
-  );
+  const token = useAuthStore((s) => s.token);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (token) {
+      router.replace("/dashboard");
+    } else {
+      router.replace("/login");
+    }
+  }, [token, router]);
+
+  return null;
 }

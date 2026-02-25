@@ -44,6 +44,7 @@ IaaS/
 - **US-1.02:** PostgreSQL Database Schema & Migrations ✅
 - **US-1.03:** JWT Auth (register, login, refresh, protected endpoints) ✅
 - **US-1.04:** Organization & User Management (invite, accept-invite, list users) ✅
+- **US-1.05:** Application Shell & Navigation (sidebar, top bar, route guards) ✅
 
 ## Publishing (Push & PR)
 
@@ -56,7 +57,7 @@ git remote add origin git@github.com:YOUR_USERNAME/iaas.git
 
 # Push main and feature branch
 git push -u origin main
-git push -u origin feature/us-1.03-jwt-auth
+git push -u origin feature/us-1.05
 ```
 
-Then create a Pull Request: **base `main`** ← **compare `feature/us-1.03-jwt-auth`**
+Then create a Pull Request: **base `main`** ← **compare `feature/us-1.05`**
