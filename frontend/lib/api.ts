@@ -1,8 +1,5 @@
 /** API base URL. In browser, use same origin when proxied; fallback for dev. */
-const API_BASE =
-  typeof window !== "undefined"
-    ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface Project {
   id: string;
@@ -13,6 +10,9 @@ export interface Project {
   language: string;
   modality: string;
   status: string;
+  interview_count?: number;
+  completion_pct?: number;
+  cost?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }

@@ -14,10 +14,11 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 def _project_row_to_dict(row, settings_json=None):
     """Convert DB row to API response dict."""
     if settings_json is None:
-        settings_json = row.get("settings_json") or {}
-    if isinstance(settings_json, str):
+        raw = row.get("settings_json")
+        settings_json = raw if isinstance(raw, dict) else (json.loads(raw) if raw else {})
+    elif isinstance(settings_json, str):
         settings_json = json.loads(settings_json) if settings_json else {}
-    return {
+    result = {
         "id": str(row["id"]),
         "title": row["title"],
         "description": row["description"],
@@ -29,6 +30,14 @@ def _project_row_to_dict(row, settings_json=None):
         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
         "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
     }
+    if "interview_count" in row:
+        result["interview_count"] = row["interview_count"]
+    if "completed_count" in row and "interview_count" in row:
+        cnt = row["interview_count"] or 0
+        result["completion_pct"] = round(100.0 * (row["completed_count"] or 0) / cnt, 1) if cnt > 0 else 0
+    if "cost" in row:
+        result["cost"] = row["cost"]
+    return result
 
 
 @router.post("", status_code=201)
@@ -79,19 +88,25 @@ def list_projects(
         with conn.cursor() as cur:
             if search:
                 cur.execute(
-                    """SELECT id, title, description, research_objectives, status, settings_json, modality_type, created_at, updated_at
-                       FROM interview_projects
-                       WHERE org_id = %s AND deleted_at IS NULL AND title ILIKE %s
-                       ORDER BY updated_at DESC
+                    """SELECT p.id, p.title, p.description, p.research_objectives, p.status, p.settings_json, p.modality_type, p.created_at, p.updated_at,
+                              (SELECT COUNT(*)::int FROM conversations c WHERE c.project_id = p.id) AS interview_count,
+                              (SELECT COUNT(*)::int FROM conversations c WHERE c.project_id = p.id AND c.status = 'completed') AS completed_count,
+                              NULL::text AS cost
+                       FROM interview_projects p
+                       WHERE p.org_id = %s AND p.deleted_at IS NULL AND p.title ILIKE %s
+                       ORDER BY p.updated_at DESC
                        LIMIT %s OFFSET %s""",
                     (org_id, f"%{search}%", limit, offset),
                 )
             else:
                 cur.execute(
-                    """SELECT id, title, description, research_objectives, status, settings_json, modality_type, created_at, updated_at
-                       FROM interview_projects
-                       WHERE org_id = %s AND deleted_at IS NULL
-                       ORDER BY updated_at DESC
+                    """SELECT p.id, p.title, p.description, p.research_objectives, p.status, p.settings_json, p.modality_type, p.created_at, p.updated_at,
+                              (SELECT COUNT(*)::int FROM conversations c WHERE c.project_id = p.id) AS interview_count,
+                              (SELECT COUNT(*)::int FROM conversations c WHERE c.project_id = p.id AND c.status = 'completed') AS completed_count,
+                              NULL::text AS cost
+                       FROM interview_projects p
+                       WHERE p.org_id = %s AND p.deleted_at IS NULL
+                       ORDER BY p.updated_at DESC
                        LIMIT %s OFFSET %s""",
                     (org_id, limit, offset),
                 )
@@ -169,7 +184,8 @@ def update_project(
         if req.research_objectives is not None:
             updates.append("research_objectives = %s")
             params.append(req.research_objectives)
-        settings = json.loads(row["settings_json"] or "{}")
+        raw = row["settings_json"]
+        settings = raw if isinstance(raw, dict) else (json.loads(raw) if raw else {})
         if req.target_audience is not None:
             settings["target_audience"] = req.target_audience
         if req.language is not None:
@@ -257,7 +273,7 @@ def clone_project(
         if not row:
             raise HTTPException(status_code=404, detail="Project not found")
         new_id = str(uuid.uuid4())
-        new_title = f"{row['title']} — Copy"
+        new_title = f"[{row['title']}] — Copy"
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO interview_projects

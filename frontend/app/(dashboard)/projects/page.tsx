@@ -102,6 +102,15 @@ export default function ProjectsPage() {
                   Status
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                  Interviews
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                  Completion %
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                  Cost
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
                   Created
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
@@ -112,7 +121,7 @@ export default function ProjectsPage() {
             <tbody className="divide-y divide-gray-200 bg-white">
               {projects.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                     No projects yet. Create one to get started.
                   </td>
                 </tr>
@@ -122,6 +131,15 @@ export default function ProjectsPage() {
                     <td className="px-4 py-3 font-medium">{p.title}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={p.status} />
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {p.interview_count ?? 0}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {p.completion_pct != null ? `${p.completion_pct}%` : "0%"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {p.cost ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {formatDate(p.created_at)}

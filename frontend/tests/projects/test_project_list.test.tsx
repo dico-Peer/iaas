@@ -2,8 +2,7 @@
  * US-2.01: Project list - search debounce and filter by title
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { useAuthStore } from "@/lib/store";
 import ProjectsPage from "@/app/(dashboard)/projects/page";
 
@@ -26,54 +25,63 @@ describe("Project List", () => {
   });
 
   it("test_search_projects_debounced_300ms", async () => {
-    mockFetch.mockResolvedValueOnce({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ projects: [], total: 0 }),
     });
-    const user = userEvent.setup({ delay: null });
+    vi.useFakeTimers();
     render(<ProjectsPage />);
+    await vi.advanceTimersByTimeAsync(500);
+    mockFetch.mockClear();
     const search = screen.getByTestId("project-search");
-    await user.type(search, "AI");
-    expect(mockFetch).toHaveBeenCalled();
-    const callsBefore = mockFetch.mock.calls.length;
-    await user.type(search, "B");
-    expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(callsBefore + 2);
+    fireEvent.change(search, { target: { value: "A" } });
+    vi.advanceTimersByTime(100);
+    expect(mockFetch).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(250);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("search=A"),
+      expect.any(Object)
+    );
+    vi.useRealTimers();
   });
 
   it("test_search_filters_by_title", async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            projects: [
-              { id: "1", title: "AI Research", status: "draft", created_at: null, updated_at: null },
-            ],
-            total: 1,
-          }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            projects: [
-              { id: "1", title: "AI Research", status: "draft", created_at: null, updated_at: null },
-            ],
-            total: 1,
-          }),
-      });
-    const user = userEvent.setup({ delay: null });
+    const projectData = {
+      projects: [
+        {
+          id: "1",
+          title: "AI Research",
+          status: "draft",
+          created_at: null,
+          updated_at: null,
+          interview_count: 0,
+          completion_pct: 0,
+          cost: null,
+        },
+      ],
+      total: 1,
+    };
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(projectData),
+    });
     render(<ProjectsPage />);
-    await vi.waitFor(() => {
-      expect(screen.getByText("AI Research")).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText("AI Research")).toBeInTheDocument();
+      },
+      { timeout: 2000 }
+    );
     const search = screen.getByTestId("project-search");
-    await user.type(search, "AI");
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("search=AI"),
-        expect.any(Object)
-      );
-    });
+    fireEvent.change(search, { target: { value: "AI" } });
+    await waitFor(
+      () => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining("search=AI"),
+          expect.any(Object)
+        );
+      },
+      { timeout: 2000 }
+    );
   });
 });
