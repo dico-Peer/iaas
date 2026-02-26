@@ -8,6 +8,7 @@ from app.auth.dependencies import get_current_designer_or_admin
 from app.database import get_connection
 from app.projects.schemas import (
     BatchPutQuestionsRequest,
+    BranchingRulesRequest,
     CreateProjectRequest,
     CreateQuestionRequest,
     ReorderRequest,
@@ -545,6 +546,50 @@ def update_question(
             cur.execute(
                 f"UPDATE interview_questions SET {', '.join(updates)} WHERE id = %s AND project_id = %s",
                 params,
+            )
+            cur.execute(
+                "SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at FROM interview_questions WHERE id = %s",
+                (question_id,),
+            )
+            row = cur.fetchone()
+    return _question_row_to_dict(row)
+
+
+@router.patch("/{project_id}/questions/{question_id}/branching")
+def update_question_branching(
+    project_id: str,
+    question_id: str,
+    req: BranchingRulesRequest,
+    current_user: dict = Depends(get_current_designer_or_admin),
+):
+    """Update branching rules for question. US-2.03."""
+    org_id = current_user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            _ensure_project_org(cur, project_id, org_id)
+            cur.execute(
+                "SELECT id FROM interview_questions WHERE id = %s AND project_id = %s",
+                (question_id, project_id),
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Question not found")
+            rules_data = {
+                "rules": [
+                    {
+                        "condition_type": r.condition_type,
+                        "condition_value": r.condition_value,
+                        "logic_operator": r.logic_operator,
+                        "target_question_id": r.target_question_id,
+                    }
+                    for r in req.rules
+                ],
+                "default_next_question_id": req.default_next_question_id,
+            }
+            cur.execute(
+                "UPDATE interview_questions SET branching_rules = %s, updated_at = NOW() WHERE id = %s AND project_id = %s",
+                (json.dumps(rules_data), question_id, project_id),
             )
             cur.execute(
                 "SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at FROM interview_questions WHERE id = %s",
