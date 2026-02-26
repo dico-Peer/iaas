@@ -26,7 +26,9 @@ import {
   batchPutQuestions,
   reorderQuestions,
   deleteQuestion,
+  updateQuestionBranching,
   type Question,
+  type BranchingRule,
 } from "@/lib/api";
 
 const QUESTION_TYPES = [
@@ -61,6 +63,11 @@ function SortableQuestionCard({
   onDeleteRequest,
   onMoveUp,
   inlineError,
+  otherQuestions,
+  allQuestions,
+  token,
+  projectId,
+  onBranchingSaved,
 }: {
   q: EditableQuestion;
   index: number;
@@ -68,6 +75,11 @@ function SortableQuestionCard({
   onDeleteRequest: (questionId: string) => void;
   onMoveUp?: (questionId: string) => void;
   inlineError?: string | null;
+  otherQuestions: EditableQuestion[];
+  allQuestions: EditableQuestion[];
+  token: string | null;
+  projectId: string;
+  onBranchingSaved?: () => void;
 }) {
   const {
     attributes,
@@ -93,7 +105,77 @@ function SortableQuestionCard({
         onMoveUp={onMoveUp}
         dragHandleProps={{ ...attributes, ...listeners }}
         inlineError={inlineError}
+        otherQuestions={otherQuestions}
+        allQuestions={allQuestions}
+        token={token}
+        projectId={projectId}
+        onBranchingSaved={onBranchingSaved}
       />
+    </div>
+  );
+}
+
+const BRANCHING_CONDITION_TYPES = [
+  { value: "answer_contains_text", label: "Answer contains text" },
+  { value: "selected_option_equals", label: "Selected option equals" },
+  { value: "rating_gte", label: "Rating ≥ value" },
+  { value: "rating_lte", label: "Rating ≤ value" },
+] as const;
+
+function FlowVisualization({
+  allQuestions,
+  currentQuestionId,
+  branchRules,
+  defaultNextId,
+}: {
+  allQuestions: EditableQuestion[];
+  currentQuestionId: string;
+  branchRules: BranchingRule[];
+  defaultNextId: string | null;
+}) {
+  const idx = (id: string) => allQuestions.findIndex((x) => x.id === id) + 1;
+  const targets = branchRules
+    .filter((r) => r.target_question_id)
+    .map((r) => r.target_question_id);
+  const uniqueTargets = [...new Set(targets)];
+  const defaultTarget = defaultNextId;
+  const currentIdx = idx(currentQuestionId);
+
+  return (
+    <div className="flow-dag">
+      <div className="mb-2 text-xs font-medium text-gray-600">Read-only flow (order + branches)</div>
+      <div className="flex flex-wrap items-start gap-4">
+        {allQuestions.map((qq, i) => (
+          <div key={qq.id} className="flex flex-col items-center">
+            <div
+              className={`rounded border px-3 py-1.5 text-sm ${
+                qq.id === currentQuestionId ? "border-blue-500 bg-blue-50 font-medium" : "border-gray-300 bg-white"
+              }`}
+              data-testid={`flow-node-Q${i + 1}`}
+            >
+              Q{i + 1}
+            </div>
+            {i < allQuestions.length - 1 && (
+              <div className="my-1 text-gray-400" aria-hidden>
+                ↓
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {currentIdx > 0 && (uniqueTargets.length > 0 || defaultTarget) && (
+        <div className="mt-3 border-t border-gray-200 pt-2 text-xs text-gray-600">
+          <span className="font-medium">Q{currentIdx}</span> branches:
+          {uniqueTargets.map((tid) => (
+            <span key={tid} className="ml-2">
+              → Q{idx(tid)}
+            </span>
+          ))}
+          {defaultTarget && !uniqueTargets.includes(defaultTarget) && (
+            <span className="ml-2 text-gray-500">(default → Q{idx(defaultTarget)})</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -106,6 +188,11 @@ function QuestionCard({
   onMoveUp,
   dragHandleProps,
   inlineError,
+  otherQuestions,
+  allQuestions,
+  token,
+  projectId,
+  onBranchingSaved,
 }: {
   q: EditableQuestion;
   index: number;
@@ -114,7 +201,41 @@ function QuestionCard({
   onMoveUp?: (questionId: string) => void;
   dragHandleProps?: Record<string, unknown>;
   inlineError?: string | null;
+  otherQuestions: EditableQuestion[];
+  allQuestions: EditableQuestion[];
+  token: string | null;
+  projectId: string;
+  onBranchingSaved?: () => void;
 }) {
+  const [branchPanelOpen, setBranchPanelOpen] = useState(false);
+  const [branchRules, setBranchRules] = useState<BranchingRule[]>([]);
+  const [defaultNextId, setDefaultNextId] = useState<string | null>(null);
+  const [savingBranching, setSavingBranching] = useState(false);
+  const [branchingError, setBranchingError] = useState<string | null>(null);
+  const [showVisualFlow, setShowVisualFlow] = useState(false);
+
+  useEffect(() => {
+    const br = q.branching_rules as { rules?: BranchingRule[]; default_next_question_id?: string } | null;
+    if (br?.rules && Array.isArray(br.rules) && br.rules.length > 0) {
+      setBranchRules([...br.rules]);
+    } else {
+      setBranchRules([]);
+    }
+    setDefaultNextId(br?.default_next_question_id ?? null);
+  }, [q.id, q.branching_rules]);
+
+  useEffect(() => {
+    if (branchPanelOpen && branchRules.length === 0) {
+      setBranchRules([
+        {
+          condition_type: "answer_contains_text",
+          condition_value: "",
+          logic_operator: "AND",
+          target_question_id: otherQuestions[0]?.id ?? "",
+        },
+      ]);
+    }
+  }, [branchPanelOpen, branchRules.length, otherQuestions]);
   const update = useCallback(
     (patch: Partial<EditableQuestion>) => {
       onChange({ ...q, ...patch });
@@ -352,12 +473,190 @@ function QuestionCard({
       <div className="mt-2 flex gap-2">
         <button
           type="button"
+          onClick={() => setBranchPanelOpen((v) => !v)}
+          className="rounded border px-3 py-1 text-blue-600"
+          data-testid="add-branch"
+        >
+          {branchPanelOpen ? "Hide Branch" : "Add Branch"}
+        </button>
+        <button
+          type="button"
           onClick={handleDeleteClick}
           className="rounded border px-3 py-1 text-red-600"
         >
           Delete
         </button>
       </div>
+      {branchPanelOpen && (
+        <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3" data-testid="branching-panel">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium">Branching rules</span>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={showVisualFlow}
+                onChange={(e) => setShowVisualFlow(e.target.checked)}
+                data-testid="visual-flow-toggle"
+              />
+              Visual Flow
+            </label>
+          </div>
+          {showVisualFlow ? (
+            <div className="mb-3 rounded border border-gray-200 bg-white p-3" data-testid="flow-visualization">
+              <FlowVisualization
+                allQuestions={allQuestions}
+                currentQuestionId={q.id}
+                branchRules={branchRules}
+                defaultNextId={defaultNextId}
+              />
+            </div>
+          ) : null}
+          {branchingError && (
+            <div
+              className="mb-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700"
+              data-testid="branching-error"
+            >
+              {branchingError}
+            </div>
+          )}
+          {branchRules.map((rule, ri) => (
+            <div key={ri} className="mb-2 flex flex-wrap items-center gap-2 rounded border bg-white p-2">
+              {ri > 0 && (
+                <select
+                  value={rule.logic_operator}
+                  onChange={(e) => {
+                    const next = [...branchRules];
+                    next[ri] = { ...next[ri], logic_operator: e.target.value };
+                    setBranchRules(next);
+                  }}
+                  className="rounded border text-xs"
+                  data-testid="logic-operator"
+                >
+                  <option value="AND">AND</option>
+                  <option value="OR">OR</option>
+                </select>
+              )}
+              <select
+                value={rule.condition_type}
+                onChange={(e) => {
+                  const next = [...branchRules];
+                  next[ri] = { ...next[ri], condition_type: e.target.value };
+                  setBranchRules(next);
+                }}
+                className="rounded border text-sm"
+                data-testid="condition-type"
+              >
+                {BRANCHING_CONDITION_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={String(rule.condition_value)}
+                onChange={(e) => {
+                  const next = [...branchRules];
+                  const val = e.target.value;
+                  next[ri] = {
+                    ...next[ri],
+                    condition_value: /^\d+$/.test(val) ? parseInt(val, 10) : val,
+                  };
+                  setBranchRules(next);
+                }}
+                placeholder="Value"
+                className="w-24 rounded border text-sm"
+                data-testid="condition-value"
+              />
+              <span className="text-xs">→</span>
+              <select
+                value={rule.target_question_id}
+                onChange={(e) => {
+                  const next = [...branchRules];
+                  next[ri] = { ...next[ri], target_question_id: e.target.value };
+                  setBranchRules(next);
+                }}
+                className="rounded border text-sm"
+                data-testid="target-question"
+              >
+                <option value="">—</option>
+                {otherQuestions.map((oq) => (
+                  <option key={oq.id} value={oq.id}>
+                    Q{allQuestions.findIndex((x) => x.id === oq.id) + 1}: {(oq.question_text || "").slice(0, 30)}…
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setBranchRules(branchRules.filter((_, j) => j !== ri))}
+                className="text-xs text-red-600"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <div className="mb-2">
+            <label className="text-xs">Default next: </label>
+            <select
+              value={defaultNextId ?? ""}
+              onChange={(e) => setDefaultNextId(e.target.value || null)}
+              className="rounded border text-sm"
+            >
+              <option value="">Next by order</option>
+              {otherQuestions.map((oq) => (
+                <option key={oq.id} value={oq.id}>
+                  Q{allQuestions.findIndex((x) => x.id === oq.id) + 1}: {(oq.question_text || "").slice(0, 30)}…
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setBranchRules([
+                  ...branchRules,
+                  {
+                    condition_type: "answer_contains_text",
+                    condition_value: "",
+                    logic_operator: "AND",
+                    target_question_id: otherQuestions[0]?.id ?? "",
+                  },
+                ])
+              }
+              className="rounded border border-dashed px-2 py-1 text-xs text-gray-600"
+              data-testid="add-another-rule"
+            >
+              {branchRules.length === 0 ? "Add rule" : "Add another rule"}
+            </button>
+            {token && !q._local && (
+              <button
+                type="button"
+                disabled={savingBranching}
+                onClick={async () => {
+                  setBranchingError(null);
+                  setSavingBranching(true);
+                  try {
+                    await updateQuestionBranching(token, projectId, q.id, {
+                      rules: branchRules.filter((r) => r.target_question_id),
+                      default_next_question_id: defaultNextId,
+                    });
+                    onChange({ ...q, branching_rules: { rules: branchRules, default_next_question_id: defaultNextId } });
+                    onBranchingSaved?.();
+                  } catch (e) {
+                    setBranchingError(e instanceof Error ? e.message : "Failed to save branching");
+                  } finally {
+                    setSavingBranching(false);
+                  }
+                }}
+                className="rounded bg-blue-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+              >
+                Save Branching
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -612,6 +911,11 @@ export default function ProjectQuestionsPage() {
                     onChange={(updated) => handleQuestionChange(i, updated)}
                     onDeleteRequest={handleDeleteRequest}
                     inlineError={inlineErrors.get(q.id)}
+                    otherQuestions={questions.filter((_, j) => j !== i)}
+                    allQuestions={questions}
+                    token={token}
+                    projectId={projectId}
+                    onBranchingSaved={load}
                     onMoveUp={async (id) => {
                       const idx = questions.findIndex((x) => x.id === id);
                       if (idx <= 0 || !token || !projectId) return;

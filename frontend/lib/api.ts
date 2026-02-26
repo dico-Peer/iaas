@@ -144,6 +144,43 @@ export async function deleteQuestion(
   if (!r.ok) throw new Error(`Failed to delete question: ${r.status}`);
 }
 
+export interface BranchingRule {
+  condition_type: string;
+  condition_value: string | number;
+  logic_operator: string;
+  target_question_id: string;
+}
+
+export interface BranchingRulesPayload {
+  rules: BranchingRule[];
+  default_next_question_id?: string | null;
+}
+
+export async function updateQuestionBranching(
+  token: string,
+  projectId: string,
+  questionId: string,
+  data: BranchingRulesPayload
+): Promise<Question> {
+  const r = await fetch(
+    `${API_BASE}/api/v1/projects/${projectId}/questions/${questionId}/branching`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    }
+  );
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    const detail = typeof body?.detail === "string" ? body.detail : `Failed to update branching: ${r.status}`;
+    throw new Error(detail);
+  }
+  return r.json();
+}
+
 export interface BatchQuestionPayload {
   order_index: number;
   question_text: string;

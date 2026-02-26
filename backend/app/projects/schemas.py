@@ -1,5 +1,5 @@
 """Project API schemas."""
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -56,15 +56,29 @@ class BatchQuestionItem(BaseModel):
     question_type: str = Field(..., pattern="^(open|multiple_choice|scale|ranking|branching_gate)$")
     probing_depth: int = Field(default=3, ge=1, le=10)
     help_text: Optional[str] = Field(None, max_length=500)
-    options_json: Optional[list] = None
-    scale_config: Optional[dict] = None
-    question_text: str = Field(..., min_length=1, max_length=1000)
-    question_type: str = Field(..., pattern="^(open|multiple_choice|scale|ranking|branching_gate)$")
-    probing_depth: int = Field(default=3, ge=1, le=10)
-    help_text: Optional[str] = Field(None, max_length=500)
     options_json: Optional[list] = None  # [str] or [{"text": str, "add_follow_up_branch": bool}]
     scale_config: Optional[dict] = None
 
 
 class BatchPutQuestionsRequest(BaseModel):
     questions: list[BatchQuestionItem]
+
+
+BRANCHING_CONDITION_TYPES = (
+    "answer_contains_text",
+    "selected_option_equals",
+    "rating_gte",
+    "rating_lte",
+)
+
+
+class BranchingRuleItem(BaseModel):
+    condition_type: str = Field(..., pattern="^(answer_contains_text|selected_option_equals|rating_gte|rating_lte)$")
+    condition_value: Union[str, int]
+    logic_operator: str = Field(default="AND", pattern="^(AND|OR)$")
+    target_question_id: str
+
+
+class BranchingRulesRequest(BaseModel):
+    rules: list[BranchingRuleItem] = Field(default_factory=list)
+    default_next_question_id: Optional[str] = None
