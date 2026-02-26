@@ -84,3 +84,46 @@ def test_branching_saved_as_jsonb(client, org_admin_token, project_with_question
     assert br["rules"][0]["condition_value"] == "love"
     assert br["rules"][0]["target_question_id"] == q2_id
     assert br["default_next_question_id"] == questions[2]["id"]
+
+
+def test_circular_branch_rejected(client, org_admin_token, project_with_questions):
+    """PATCH /questions/{id}/branching returns 400 when circular branch detected."""
+    project_id, questions = project_with_questions
+    q1_id = questions[0]["id"]
+    q2_id = questions[1]["id"]
+    # Q1 -> Q2
+    r1 = client.patch(
+        f"/api/v1/projects/{project_id}/questions/{q1_id}/branching",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+        json={
+            "rules": [
+                {
+                    "condition_type": "answer_contains_text",
+                    "condition_value": "yes",
+                    "logic_operator": "AND",
+                    "target_question_id": q2_id,
+                }
+            ],
+            "default_next_question_id": None,
+        },
+    )
+    assert r1.status_code == 200
+    # Q2 -> Q1 creates cycle
+    r2 = client.patch(
+        f"/api/v1/projects/{project_id}/questions/{q2_id}/branching",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+        json={
+            "rules": [
+                {
+                    "condition_type": "answer_contains_text",
+                    "condition_value": "no",
+                    "logic_operator": "AND",
+                    "target_question_id": q1_id,
+                }
+            ],
+            "default_next_question_id": None,
+        },
+    )
+    assert r2.status_code == 400
+    data = r2.json()
+    assert "Circular branch detected" in data.get("detail", "")

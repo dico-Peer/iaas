@@ -173,7 +173,11 @@ export async function updateQuestionBranching(
       body: JSON.stringify(data),
     }
   );
-  if (!r.ok) throw new Error(`Failed to update branching: ${r.status}`);
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    const detail = typeof body?.detail === "string" ? body.detail : `Failed to update branching: ${r.status}`;
+    throw new Error(detail);
+  }
   return r.json();
 }
 

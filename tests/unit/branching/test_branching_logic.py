@@ -1,68 +1,19 @@
 """
 US-2.03: Branching Logic Builder
 Test Specification: evaluate conditions, detect circular references.
+Production logic lives in backend/app/branching/logic.py.
 """
 
 import pytest
 
-
-def evaluate_text_contains(answer: str, condition_value: str) -> bool:
-    """Check if answer contains condition_value (case-insensitive)."""
-    return condition_value.lower() in (answer or "").lower()
-
-
-def evaluate_rating_gte(rating: int, condition_value: int) -> bool:
-    """Check if rating >= condition_value."""
-    return rating >= condition_value
-
-
-def evaluate_rating_lte(rating: int, condition_value: int) -> bool:
-    """Check if rating <= condition_value."""
-    return rating <= condition_value
-
-
-def evaluate_option_equals(selected: str, condition_value: str) -> bool:
-    """Check if selected option equals condition_value."""
-    return (selected or "").strip() == (condition_value or "").strip()
-
-
-def detect_circular_reference(
-    rules_by_question: dict[str, list[dict]],
-) -> list[tuple[str, str]]:
-    """DFS to find cycles. Returns list of (from_id, to_id) in cycles."""
-    cycles = []
-    visited = set()
-    rec_stack = set()
-    path = []
-    path_set = set()
-
-    def dfs(qid: str) -> bool:
-        visited.add(qid)
-        rec_stack.add(qid)
-        path.append(qid)
-        path_set.add(qid)
-        for rule in rules_by_question.get(qid, []):
-            target = rule.get("target_question_id")
-            if not target:
-                continue
-            if target not in visited:
-                if dfs(target):
-                    return True
-            elif target in rec_stack:
-                idx = path.index(target)
-                cycle = path[idx:] + [target]
-                for i in range(len(cycle) - 1):
-                    cycles.append((cycle[i], cycle[i + 1]))
-                return True
-        path.pop()
-        path_set.discard(qid)
-        rec_stack.discard(qid)
-        return False
-
-    for qid in rules_by_question:
-        if qid not in visited:
-            dfs(qid)
-    return list(set(cycles))
+from app.branching.logic import (
+    detect_circular_reference,
+    evaluate_option_equals,
+    evaluate_rating_gte,
+    evaluate_rating_lte,
+    evaluate_rules,
+    evaluate_text_contains,
+)
 
 
 def test_evaluate_text_contains():
@@ -96,12 +47,36 @@ def test_evaluate_option_equals():
 
 def test_evaluate_combined_and():
     """Both conditions true → target fired."""
-    assert evaluate_text_contains("love it", "love") and evaluate_rating_gte(8, 7)
+    rules = [
+        {"condition_type": "answer_contains_text", "condition_value": "love", "target_question_id": "q3"},
+        {"condition_type": "rating_gte", "condition_value": 7, "logic_operator": "AND", "target_question_id": "q3"},
+    ]
+    # Both match: "love it" contains "love", rating 8 >= 7
+    target = evaluate_rules(rules, answer_text="love it", rating=8)
+    assert target == "q3"
+    # First matches, second fails
+    target = evaluate_rules(rules, answer_text="love it", rating=5)
+    assert target is None
+    # Second matches, first fails
+    target = evaluate_rules(rules, answer_text="hate it", rating=8)
+    assert target is None
 
 
 def test_evaluate_combined_or():
     """One condition true → target fired."""
-    assert evaluate_text_contains("love", "love") or evaluate_rating_gte(6, 7)
+    rules = [
+        {"condition_type": "answer_contains_text", "condition_value": "love", "target_question_id": "q3"},
+        {"condition_type": "rating_gte", "condition_value": 7, "logic_operator": "OR", "target_question_id": "q3"},
+    ]
+    # First matches
+    target = evaluate_rules(rules, answer_text="love it", rating=3)
+    assert target == "q3"
+    # Second matches
+    target = evaluate_rules(rules, answer_text="hate it", rating=8)
+    assert target == "q3"
+    # Neither matches
+    target = evaluate_rules(rules, answer_text="hate it", rating=3)
+    assert target is None
 
 
 def test_detect_circular_reference():

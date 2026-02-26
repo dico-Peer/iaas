@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth.dependencies import get_current_designer_or_admin
+from app.branching.logic import detect_circular_reference
 from app.database import get_connection
 from app.projects.schemas import (
     BatchPutQuestionsRequest,
@@ -334,6 +335,12 @@ def _question_row_to_dict(row):
     opts = raw_opts if isinstance(raw_opts, list) else (raw_opts or [])
     raw_scale = row.get("scale_config")
     scale = raw_scale if isinstance(raw_scale, dict) else (raw_scale or {})
+    raw_br = row.get("branching_rules")
+    br = (
+        raw_br
+        if isinstance(raw_br, dict)
+        else (json.loads(raw_br) if isinstance(raw_br, str) else None)
+    )
     return {
         "id": str(row["id"]),
         "order_index": row["order_index"],
@@ -343,7 +350,7 @@ def _question_row_to_dict(row):
         "help_text": row.get("help_text"),
         "options_json": opts if opts else None,
         "scale_config": scale if scale else None,
-        "branching_rules": row.get("branching_rules"),
+        "branching_rules": br,
         "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
         "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
     }
@@ -555,6 +562,27 @@ def update_question(
     return _question_row_to_dict(row)
 
 
+def _build_rules_by_question(cur, project_id: str, question_id: str, new_rules_data: dict) -> dict:
+    """Build rules_by_question including the pending update for circular detection."""
+    cur.execute(
+        """SELECT id, branching_rules FROM interview_questions WHERE project_id = %s""",
+        (project_id,),
+    )
+    rows = cur.fetchall()
+    rules_by_question: dict[str, list[dict]] = {}
+    for r in rows:
+        qid = str(r["id"])
+        raw = r.get("branching_rules")
+        br = raw if isinstance(raw, dict) else (json.loads(raw) if isinstance(raw, str) else None)
+        rules = br.get("rules", []) if br else []
+        if qid == question_id:
+            rules = new_rules_data.get("rules", [])
+        filtered = [x for x in rules if x.get("target_question_id")]
+        if filtered:
+            rules_by_question[qid] = filtered
+    return rules_by_question
+
+
 @router.patch("/{project_id}/questions/{question_id}/branching")
 def update_question_branching(
     project_id: str,
@@ -562,7 +590,7 @@ def update_question_branching(
     req: BranchingRulesRequest,
     current_user: dict = Depends(get_current_designer_or_admin),
 ):
-    """Update branching rules for question. US-2.03."""
+    """Update branching rules for question. US-2.03. Rejects circular branches (AC6)."""
     org_id = current_user.get("org_id")
     if not org_id:
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -587,6 +615,21 @@ def update_question_branching(
                 ],
                 "default_next_question_id": req.default_next_question_id,
             }
+            rules_by_question = _build_rules_by_question(cur, project_id, question_id, rules_data)
+            cycles = detect_circular_reference(rules_by_question)
+            if cycles:
+                a, b = cycles[0]
+                cur.execute(
+                    "SELECT id, order_index FROM interview_questions WHERE project_id = %s ORDER BY order_index",
+                    (project_id,),
+                )
+                order_map = {str(r["id"]): i + 1 for i, r in enumerate(cur.fetchall())}
+                qa = order_map.get(a, a)
+                qb = order_map.get(b, b)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Circular branch detected between Q{qa} and Q{qb}.",
+                )
             cur.execute(
                 "UPDATE interview_questions SET branching_rules = %s, updated_at = NOW() WHERE id = %s AND project_id = %s",
                 (json.dumps(rules_data), question_id, project_id),

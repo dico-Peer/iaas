@@ -70,10 +70,10 @@ describe("Branching Builder", () => {
       const selects = screen.getAllByTestId("condition-type");
       expect(selects.length).toBeGreaterThan(0);
     });
-    expect(screen.getByText("Answer contains text")).toBeInTheDocument();
-    expect(screen.getByText("Selected option equals")).toBeInTheDocument();
-    expect(screen.getByText("Rating ≥ value")).toBeInTheDocument();
-    expect(screen.getByText("Rating ≤ value")).toBeInTheDocument();
+    const conditionLabels = ["Answer contains text", "Selected option equals", "Rating ≥ value", "Rating ≤ value"];
+    conditionLabels.forEach((label) => {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    });
   });
 
   it("test_and_or_logic_toggle", async () => {
@@ -103,5 +103,71 @@ describe("Branching Builder", () => {
     });
     const logicSelects = screen.getAllByTestId("logic-operator");
     expect(logicSelects[0]).toBeInTheDocument();
+  });
+
+  it("test_flow_visualization_renders", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          questions: [
+            { id: "q1", order_index: 0, question_text: "A", question_type: "open", probing_depth: 1 },
+            { id: "q2", order_index: 1, question_text: "B", question_type: "open", probing_depth: 1 },
+          ],
+        }),
+    });
+    render(<ProjectQuestionsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("A")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getAllByTestId("add-branch")[0]);
+    await waitFor(() => {
+      expect(screen.getByTestId("branching-panel")).toBeInTheDocument();
+    });
+    const toggle = screen.getByTestId("visual-flow-toggle");
+    expect(toggle).toBeInTheDocument();
+    fireEvent.click(toggle);
+    await waitFor(() => {
+      expect(screen.getByTestId("flow-visualization")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("flow-node-Q1")).toBeInTheDocument();
+    expect(screen.getByTestId("flow-node-Q2")).toBeInTheDocument();
+  });
+
+  it("test_circular_branch_detected", async () => {
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (typeof url === "string" && url.includes("/branching") && opts?.method === "PATCH") {
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          json: () => Promise.resolve({ detail: "Circular branch detected between Q1 and Q2." }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            questions: [
+              { id: "q1", order_index: 0, question_text: "A", question_type: "open", probing_depth: 1 },
+              { id: "q2", order_index: 1, question_text: "B", question_type: "open", probing_depth: 1 },
+            ],
+          }),
+      } as Response);
+    });
+    render(<ProjectQuestionsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("A")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getAllByTestId("add-branch")[0]);
+    await waitFor(() => {
+      expect(screen.getByTestId("branching-panel")).toBeInTheDocument();
+    });
+    const targetSelect = screen.getByTestId("target-question");
+    fireEvent.change(targetSelect, { target: { value: "q2" } });
+    fireEvent.click(screen.getByText("Save Branching"));
+    await waitFor(() => {
+      expect(screen.getByTestId("branching-error")).toBeInTheDocument();
+      expect(screen.getByText("Circular branch detected between Q1 and Q2.")).toBeInTheDocument();
+    });
   });
 });
