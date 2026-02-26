@@ -23,8 +23,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useAuthStore } from "@/lib/store";
 import {
   fetchQuestions,
-  createQuestion,
-  updateQuestion,
+  batchPutQuestions,
   reorderQuestions,
   deleteQuestion,
   type Question,
@@ -35,24 +34,40 @@ const QUESTION_TYPES = [
   { value: "scale", label: "Rating" },
   { value: "multiple_choice", label: "Multiple choice" },
   { value: "ranking", label: "Ranking" },
+  { value: "branching_gate", label: "Branching gate" },
 ] as const;
+
+export type EditableQuestion = Question & {
+  _local?: boolean;
+};
+
+type McOption = { text: string; add_follow_up_branch: boolean };
+
+function normalizeOptions(
+  raw: string[] | { text: string; add_follow_up_branch?: boolean }[] | null | undefined
+): McOption[] {
+  if (!raw || !Array.isArray(raw)) return [{ text: "", add_follow_up_branch: false }, { text: "", add_follow_up_branch: false }];
+  return raw.map((o) =>
+    typeof o === "string"
+      ? { text: o, add_follow_up_branch: false }
+      : { text: o.text ?? "", add_follow_up_branch: !!o.add_follow_up_branch }
+  );
+}
 
 function SortableQuestionCard({
   q,
   index,
-  onUpdate,
+  onChange,
   onDeleteRequest,
   onMoveUp,
-  token,
-  projectId,
+  inlineError,
 }: {
-  q: Question;
+  q: EditableQuestion;
   index: number;
-  onUpdate: () => void;
+  onChange: (updated: EditableQuestion) => void;
   onDeleteRequest: (questionId: string) => void;
   onMoveUp?: (questionId: string) => void;
-  token: string;
-  projectId: string;
+  inlineError?: string | null;
 }) {
   const {
     attributes,
@@ -73,12 +88,11 @@ function SortableQuestionCard({
       <QuestionCard
         q={q}
         index={index}
-        onUpdate={onUpdate}
+        onChange={onChange}
         onDeleteRequest={onDeleteRequest}
         onMoveUp={onMoveUp}
-        token={token}
-        projectId={projectId}
         dragHandleProps={{ ...attributes, ...listeners }}
+        inlineError={inlineError}
       />
     </div>
   );
@@ -87,103 +101,39 @@ function SortableQuestionCard({
 function QuestionCard({
   q,
   index,
-  onUpdate,
+  onChange,
   onDeleteRequest,
   onMoveUp,
-  token,
-  projectId,
   dragHandleProps,
+  inlineError,
 }: {
-  q: Question;
+  q: EditableQuestion;
   index: number;
-  onUpdate: () => void;
+  onChange: (updated: EditableQuestion) => void;
   onDeleteRequest: (questionId: string) => void;
   onMoveUp?: (questionId: string) => void;
-  token: string;
-  projectId: string;
   dragHandleProps?: Record<string, unknown>;
+  inlineError?: string | null;
 }) {
-  const [text, setText] = useState(q.question_text);
-  const [type, setType] = useState(q.question_type);
-  const [depth, setDepth] = useState(q.probing_depth);
-  const [helpText, setHelpText] = useState(q.help_text ?? "");
-  const [scaleMin, setScaleMin] = useState(
-    (q.scale_config as { min?: number })?.min ?? 1
+  const update = useCallback(
+    (patch: Partial<EditableQuestion>) => {
+      onChange({ ...q, ...patch });
+    },
+    [q, onChange]
   );
-  const [scaleMax, setScaleMax] = useState(
-    (q.scale_config as { max?: number })?.max ?? 10
-  );
-  const [scaleMinLabel, setScaleMinLabel] = useState(
-    (q.scale_config as { min_label?: string })?.min_label ?? "Not at all"
-  );
-  const [scaleMaxLabel, setScaleMaxLabel] = useState(
-    (q.scale_config as { max_label?: string })?.max_label ?? "Extremely"
-  );
-  const [options, setOptions] = useState<string[]>(
-    Array.isArray(q.options_json) ? [...q.options_json] : ["", ""]
-  );
-  const [saving, setSaving] = useState(false);
-  const [inlineError, setInlineError] = useState<string | null>(null);
 
-  const handleSave = useCallback(async () => {
-    if (!token || !projectId) return;
-    const trimmed = text.trim();
-    if (!trimmed) {
-      setInlineError("Question text is required");
-      return;
-    }
-    setInlineError(null);
-    setSaving(true);
-    try {
-      const payload: Parameters<typeof updateQuestion>[3] = {
-        question_text: trimmed,
-        question_type: type,
-        probing_depth: depth,
-        help_text: helpText || undefined,
-      };
-      if (type === "scale") {
-        payload.scale_config = {
-          min: scaleMin,
-          max: scaleMax,
-          min_label: scaleMinLabel,
-          max_label: scaleMaxLabel,
-        };
-      }
-      if (type === "multiple_choice") {
-        const opts = options.filter((o) => o.trim().length > 0);
-        if (opts.length < 2) {
-          setInlineError("At least 2 options required for multiple choice");
-          setSaving(false);
-          return;
-        }
-        payload.options_json = opts;
-      }
-      await updateQuestion(token, projectId, q.id, payload);
-      onUpdate();
-    } catch {
-      setInlineError("Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    token,
-    projectId,
-    q.id,
-    text,
-    type,
-    depth,
-    helpText,
-    scaleMin,
-    scaleMax,
-    scaleMinLabel,
-    scaleMaxLabel,
-    options,
-    onUpdate,
-  ]);
+  const options = normalizeOptions(q.options_json as McOption[] | string[] | null);
 
   const handleDeleteClick = useCallback(() => {
     onDeleteRequest(q.id);
   }, [q.id, onDeleteRequest]);
+
+  const setOptions = useCallback(
+    (next: McOption[]) => {
+      update({ options_json: next });
+    },
+    [update]
+  );
 
   return (
     <div
@@ -199,8 +149,8 @@ function QuestionCard({
           ⋮⋮
         </span>
         <span className="font-medium">Q{index + 1}</span>
-        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs">{type}</span>
-        <span className="text-xs text-gray-500">Depth: {depth}</span>
+        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs">{q.question_type}</span>
+        <span className="text-xs text-gray-500">Depth: {q.probing_depth}</span>
         {index > 0 && onMoveUp && (
           <button
             type="button"
@@ -213,11 +163,8 @@ function QuestionCard({
         )}
       </div>
       <textarea
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          setInlineError(null);
-        }}
+        value={q.question_text}
+        onChange={(e) => update({ question_text: e.target.value })}
         placeholder="Question text (required)"
         maxLength={1000}
         className="mb-2 w-full rounded border p-2"
@@ -234,8 +181,8 @@ function QuestionCard({
       <div className="mb-2">
         <label className="block text-sm text-gray-600">Help text (optional)</label>
         <textarea
-          value={helpText}
-          onChange={(e) => setHelpText(e.target.value)}
+          value={q.help_text ?? ""}
+          onChange={(e) => update({ help_text: e.target.value || undefined })}
           placeholder="Optional help text"
           maxLength={500}
           className="mt-1 w-full rounded border p-2 text-sm"
@@ -246,8 +193,8 @@ function QuestionCard({
         <label className="flex items-center gap-2">
           Type:
           <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
+            value={q.question_type}
+            onChange={(e) => update({ question_type: e.target.value })}
             className="rounded border"
           >
             {QUESTION_TYPES.map((t) => (
@@ -263,14 +210,14 @@ function QuestionCard({
             type="range"
             min={1}
             max={10}
-            value={depth}
-            onChange={(e) => setDepth(Number(e.target.value))}
+            value={q.probing_depth}
+            onChange={(e) => update({ probing_depth: Number(e.target.value) })}
             className="w-24"
           />
-          <span>{depth}</span>
+          <span>{q.probing_depth}</span>
         </label>
       </div>
-      {type === "scale" && (
+      {q.question_type === "scale" && (
         <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3" data-testid="scale-fields">
           <div className="grid grid-cols-2 gap-2 text-sm">
             <label>
@@ -279,8 +226,15 @@ function QuestionCard({
                 type="number"
                 min={0}
                 max={100}
-                value={scaleMin}
-                onChange={(e) => setScaleMin(Number(e.target.value))}
+                value={(q.scale_config as { min?: number })?.min ?? 1}
+                onChange={(e) =>
+                  update({
+                    scale_config: {
+                      ...(q.scale_config as object),
+                      min: Number(e.target.value),
+                    },
+                  })
+                }
                 className="ml-1 w-16 rounded border"
                 data-testid="scale-min"
               />
@@ -291,8 +245,15 @@ function QuestionCard({
                 type="number"
                 min={0}
                 max={100}
-                value={scaleMax}
-                onChange={(e) => setScaleMax(Number(e.target.value))}
+                value={(q.scale_config as { max?: number })?.max ?? 10}
+                onChange={(e) =>
+                  update({
+                    scale_config: {
+                      ...(q.scale_config as object),
+                      max: Number(e.target.value),
+                    },
+                  })
+                }
                 className="ml-1 w-16 rounded border"
                 data-testid="scale-max"
               />
@@ -301,8 +262,15 @@ function QuestionCard({
               Min label:
               <input
                 type="text"
-                value={scaleMinLabel}
-                onChange={(e) => setScaleMinLabel(e.target.value)}
+                value={(q.scale_config as { min_label?: string })?.min_label ?? "Not at all"}
+                onChange={(e) =>
+                  update({
+                    scale_config: {
+                      ...(q.scale_config as object),
+                      min_label: e.target.value,
+                    },
+                  })
+                }
                 className="ml-1 w-full rounded border"
                 data-testid="scale-min-label"
               />
@@ -311,8 +279,15 @@ function QuestionCard({
               Max label:
               <input
                 type="text"
-                value={scaleMaxLabel}
-                onChange={(e) => setScaleMaxLabel(e.target.value)}
+                value={(q.scale_config as { max_label?: string })?.max_label ?? "Extremely"}
+                onChange={(e) =>
+                  update({
+                    scale_config: {
+                      ...(q.scale_config as object),
+                      max_label: e.target.value,
+                    },
+                  })
+                }
                 className="ml-1 w-full rounded border"
                 data-testid="scale-max-label"
               />
@@ -320,23 +295,36 @@ function QuestionCard({
           </div>
         </div>
       )}
-      {type === "multiple_choice" && (
+      {q.question_type === "multiple_choice" && (
         <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3" data-testid="options-section">
           <div className="mb-2 text-sm font-medium">Options (2-10)</div>
           {options.map((opt, i) => (
-            <div key={i} className="mb-2 flex gap-2">
+            <div key={i} className="mb-2 flex items-center gap-2">
               <input
                 type="text"
-                value={opt}
+                value={opt.text}
                 onChange={(e) => {
                   const next = [...options];
-                  next[i] = e.target.value;
+                  next[i] = { ...next[i], text: e.target.value };
                   setOptions(next);
                 }}
                 placeholder={`Option ${i + 1}`}
                 className="flex-1 rounded border"
                 data-testid={`option-${i}`}
               />
+              <label className="flex items-center gap-1 text-xs">
+                <input
+                  type="checkbox"
+                  checked={opt.add_follow_up_branch}
+                  onChange={(e) => {
+                    const next = [...options];
+                    next[i] = { ...next[i], add_follow_up_branch: e.target.checked };
+                    setOptions(next);
+                  }}
+                  data-testid={`option-${i}-branch-toggle`}
+                />
+                Add follow-up branch
+              </label>
               <button
                 type="button"
                 onClick={() => {
@@ -353,7 +341,7 @@ function QuestionCard({
           {options.length < 10 && (
             <button
               type="button"
-              onClick={() => setOptions([...options, ""])}
+              onClick={() => setOptions([...options, { text: "", add_follow_up_branch: false }])}
               className="rounded border border-dashed px-3 py-1 text-sm text-gray-600"
             >
               Add option
@@ -362,14 +350,6 @@ function QuestionCard({
         </div>
       )}
       <div className="mt-2 flex gap-2">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded bg-blue-600 px-3 py-1 text-white disabled:opacity-50"
-        >
-          Save
-        </button>
         <button
           type="button"
           onClick={handleDeleteClick}
@@ -386,9 +366,11 @@ export default function ProjectQuestionsPage() {
   const params = useParams();
   const projectId = params?.id as string;
   const token = useAuthStore((s) => s.token);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<EditableQuestion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveToast, setSaveToast] = useState(false);
   const [deleteToast, setDeleteToast] = useState<{
     questionId: string;
     questionText: string;
@@ -401,7 +383,7 @@ export default function ProjectQuestionsPage() {
     setError(null);
     try {
       const data = await fetchQuestions(token, projectId);
-      setQuestions(data.questions);
+      setQuestions(data.questions.map((q) => ({ ...q, _local: false })));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -413,10 +395,30 @@ export default function ProjectQuestionsPage() {
     load();
   }, [load]);
 
+  const [inlineErrors, setInlineErrors] = useState<Map<string, string>>(new Map());
+
+  const handleQuestionChange = useCallback((index: number, updated: EditableQuestion) => {
+    setQuestions((prev) => {
+      const next = [...prev];
+      next[index] = updated;
+      return next;
+    });
+    setInlineErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(updated.id);
+      return next;
+    });
+  }, []);
+
   const handleDeleteRequest = useCallback(
     (questionId: string) => {
       const q = questions.find((x) => x.id === questionId);
-      if (!q || !token || !projectId) return;
+      if (!q) return;
+      if (q._local) {
+        setQuestions((prev) => prev.filter((x) => x.id !== questionId));
+        return;
+      }
+      if (!token || !projectId) return;
       setDeleteToast({ questionId, questionText: q.question_text });
       if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
       deleteTimeoutRef.current = setTimeout(() => {
@@ -444,19 +446,87 @@ export default function ProjectQuestionsPage() {
     };
   }, []);
 
-  const handleAddQuestion = useCallback(async () => {
-    if (!token || !projectId) return;
-    try {
-      await createQuestion(token, projectId, {
-        question_text: "New question",
+  const handleAddQuestion = useCallback(() => {
+    const newId = `new-${crypto.randomUUID()}`;
+    setQuestions((prev) => [
+      ...prev,
+      {
+        id: newId,
+        order_index: prev.length,
+        question_text: "",
         question_type: "open",
         probing_depth: 3,
+        help_text: null,
+        options_json: null,
+        scale_config: null,
+        branching_rules: null,
+        created_at: null,
+        updated_at: null,
+        _local: true,
+      } as EditableQuestion,
+    ]);
+  }, []);
+
+  const handleSaveAll = useCallback(async () => {
+    if (!token || !projectId) return;
+    const errs = new Map<string, string>();
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      const trimmed = (q.question_text || "").trim();
+      if (!trimmed) {
+        errs.set(q.id, "Question text is required");
+      }
+      if (q.question_type === "multiple_choice") {
+        const opts = normalizeOptions(q.options_json as McOption[] | string[] | null);
+        const filled = opts.filter((o) => o.text.trim().length > 0);
+        if (filled.length < 2) {
+          errs.set(q.id, "At least 2 options required for multiple choice");
+        }
+      }
+    }
+    if (errs.size > 0) {
+      setInlineErrors(errs);
+      return;
+    }
+    setInlineErrors(new Map());
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = questions.map((q, i) => {
+        const scale =
+          q.question_type === "scale" && q.scale_config
+            ? q.scale_config
+            : undefined;
+        let opts: string[] | { text: string; add_follow_up_branch: boolean }[] | undefined;
+        if (q.question_type === "multiple_choice" && q.options_json) {
+          const normalized = normalizeOptions(q.options_json as McOption[] | string[]);
+          const filled = normalized.filter((o) => o.text.trim().length > 0);
+          opts = filled.map((o) =>
+            o.add_follow_up_branch ? { text: o.text, add_follow_up_branch: true } : o.text
+          );
+        } else {
+          opts = undefined;
+        }
+        return {
+          order_index: i,
+          question_text: (q.question_text || "").trim(),
+          question_type: q.question_type,
+          probing_depth: q.probing_depth,
+          help_text: (q.help_text || "").trim() || undefined,
+          options_json: opts,
+          scale_config: scale,
+        };
       });
+      await batchPutQuestions(token, projectId, payload);
+      setSaveToast(true);
+      setTimeout(() => setSaveToast(false), 3000);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to add");
+      setError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
     }
-  }, [token, projectId, load]);
+  }, [questions, token, projectId, load]);
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -465,15 +535,16 @@ export default function ProjectQuestionsPage() {
       const oldIndex = questions.findIndex((q) => q.id === active.id);
       const newIndex = questions.findIndex((q) => q.id === over.id);
       if (oldIndex === -1 || newIndex === -1) return;
+      const next = arrayMove(questions, oldIndex, newIndex);
+      setQuestions(next);
       try {
         await reorderQuestions(token, projectId, String(active.id), newIndex);
-        const next = arrayMove(questions, oldIndex, newIndex);
-        setQuestions(next);
+        load();
       } catch {
         setError("Failed to reorder");
       }
     },
-    [questions, token, projectId]
+    [questions, token, projectId, load]
   );
 
   const sensors = useSensors(
@@ -494,6 +565,14 @@ export default function ProjectQuestionsPage() {
       {error && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-red-700">
           {error}
+        </div>
+      )}
+      {saveToast && (
+        <div
+          className="mb-4 rounded border border-green-200 bg-green-50 p-3 text-green-800"
+          data-testid="save-toast"
+        >
+          Questions saved.
         </div>
       )}
       {deleteToast && (
@@ -530,8 +609,9 @@ export default function ProjectQuestionsPage() {
                     key={q.id}
                     q={q}
                     index={i}
-                    onUpdate={load}
+                    onChange={(updated) => handleQuestionChange(i, updated)}
                     onDeleteRequest={handleDeleteRequest}
+                    inlineError={inlineErrors.get(q.id)}
                     onMoveUp={async (id) => {
                       const idx = questions.findIndex((x) => x.id === id);
                       if (idx <= 0 || !token || !projectId) return;
@@ -542,21 +622,30 @@ export default function ProjectQuestionsPage() {
                         setError("Failed to reorder");
                       }
                     }}
-                    token={token!}
-                    projectId={projectId}
                   />
                 ))}
               </div>
             </SortableContext>
           </DndContext>
-          <button
-            type="button"
-            onClick={handleAddQuestion}
-            className="rounded border border-dashed border-gray-400 px-4 py-2 text-gray-600 hover:bg-gray-50"
-            data-testid="add-question"
-          >
-            Add Question
-          </button>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={handleAddQuestion}
+              className="rounded border border-dashed border-gray-400 px-4 py-2 text-gray-600 hover:bg-gray-50"
+              data-testid="add-question"
+            >
+              Add Question
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveAll}
+              disabled={saving}
+              className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+              data-testid="save-all"
+            >
+              Save
+            </button>
+          </div>
         </>
       )}
     </div>

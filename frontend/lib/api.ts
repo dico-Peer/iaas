@@ -143,3 +143,30 @@ export async function deleteQuestion(
   });
   if (!r.ok) throw new Error(`Failed to delete question: ${r.status}`);
 }
+
+export interface BatchQuestionPayload {
+  order_index: number;
+  question_text: string;
+  question_type: string;
+  probing_depth: number;
+  help_text?: string;
+  options_json?: string[] | { text: string; add_follow_up_branch?: boolean }[];
+  scale_config?: Record<string, unknown>;
+}
+
+export async function batchPutQuestions(
+  token: string,
+  projectId: string,
+  questions: BatchQuestionPayload[]
+): Promise<{ questions: Question[] }> {
+  const r = await fetch(`${API_BASE}/api/v1/projects/${projectId}/questions`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ questions }),
+  });
+  if (!r.ok) throw new Error(`Failed to save questions: ${r.status}`);
+  return r.json();
+}

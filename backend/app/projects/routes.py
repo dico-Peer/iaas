@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.auth.dependencies import get_current_designer_or_admin
 from app.database import get_connection
 from app.projects.schemas import (
+    BatchPutQuestionsRequest,
     CreateProjectRequest,
     CreateQuestionRequest,
     ReorderRequest,
@@ -317,16 +318,14 @@ def clone_project(
     return _project_row_to_dict(new_row)
 
 
-def _ensure_project_org(project_id: str, org_id: str) -> None:
-    """Raise 404 if project not found or not in org."""
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id FROM interview_projects WHERE id = %s AND org_id = %s AND deleted_at IS NULL",
-                (project_id, org_id),
-            )
-            if not cur.fetchone():
-                raise HTTPException(status_code=404, detail="Project not found")
+def _ensure_project_org(cur, project_id: str, org_id: str) -> None:
+    """Raise 404 if project not found or not in org. Uses provided cursor."""
+    cur.execute(
+        "SELECT id FROM interview_projects WHERE id = %s AND org_id = %s AND deleted_at IS NULL",
+        (project_id, org_id),
+    )
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Project not found")
 
 
 def _question_row_to_dict(row):
@@ -358,9 +357,9 @@ def list_questions(
     org_id = current_user.get("org_id")
     if not org_id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    _ensure_project_org(project_id, org_id)
     with get_connection() as conn:
         with conn.cursor() as cur:
+            _ensure_project_org(cur, project_id, org_id)
             cur.execute(
                 """SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at
                    FROM interview_questions WHERE project_id = %s ORDER BY order_index""",
@@ -369,6 +368,46 @@ def list_questions(
             rows = cur.fetchall()
     questions = [_question_row_to_dict(r) for r in rows]
     return {"questions": questions}
+
+
+@router.put("/{project_id}/questions")
+def batch_put_questions(
+    project_id: str,
+    req: BatchPutQuestionsRequest,
+    current_user: dict = Depends(get_current_designer_or_admin),
+):
+    """Replace all questions for project. AC #7: batch persist."""
+    org_id = current_user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            _ensure_project_org(cur, project_id, org_id)
+            cur.execute("DELETE FROM interview_questions WHERE project_id = %s", (project_id,))
+            for i, q in enumerate(req.questions):
+                opts = json.dumps(q.options_json) if q.options_json else None
+                scale = json.dumps(q.scale_config) if q.scale_config else None
+                cur.execute(
+                    """INSERT INTO interview_questions (project_id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (
+                        project_id,
+                        i,
+                        q.question_text,
+                        q.question_type,
+                        q.probing_depth,
+                        q.help_text,
+                        opts,
+                        scale,
+                    ),
+                )
+            cur.execute(
+                """SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at
+                   FROM interview_questions WHERE project_id = %s ORDER BY order_index""",
+                (project_id,),
+            )
+            rows = cur.fetchall()
+    return {"questions": [_question_row_to_dict(r) for r in rows]}
 
 
 @router.post("/{project_id}/questions", status_code=201)
@@ -381,9 +420,9 @@ def create_question(
     org_id = current_user.get("org_id")
     if not org_id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    _ensure_project_org(project_id, org_id)
     with get_connection() as conn:
         with conn.cursor() as cur:
+            _ensure_project_org(cur, project_id, org_id)
             cur.execute(
                 "SELECT COALESCE(MAX(order_index), -1) + 1 AS next_idx FROM interview_questions WHERE project_id = %s",
                 (project_id,),
@@ -418,9 +457,9 @@ def reorder_questions(
     org_id = current_user.get("org_id")
     if not org_id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    _ensure_project_org(project_id, org_id)
     with get_connection() as conn:
         with conn.cursor() as cur:
+            _ensure_project_org(cur, project_id, org_id)
             cur.execute(
                 "SELECT id, order_index FROM interview_questions WHERE project_id = %s ORDER BY order_index",
                 (project_id,),
@@ -468,9 +507,9 @@ def update_question(
     org_id = current_user.get("org_id")
     if not org_id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    _ensure_project_org(project_id, org_id)
     with get_connection() as conn:
         with conn.cursor() as cur:
+            _ensure_project_org(cur, project_id, org_id)
             cur.execute(
                 "SELECT id, order_index, question_text, question_type, probing_depth, help_text, options_json, scale_config, branching_rules, created_at, updated_at FROM interview_questions WHERE id = %s AND project_id = %s",
                 (question_id, project_id),
@@ -525,9 +564,9 @@ def delete_question(
     org_id = current_user.get("org_id")
     if not org_id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    _ensure_project_org(project_id, org_id)
     with get_connection() as conn:
         with conn.cursor() as cur:
+            _ensure_project_org(cur, project_id, org_id)
             cur.execute(
                 "DELETE FROM interview_questions WHERE id = %s AND project_id = %s",
                 (question_id, project_id),

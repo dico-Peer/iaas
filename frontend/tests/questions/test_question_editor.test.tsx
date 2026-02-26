@@ -46,45 +46,20 @@ describe("Question Editor", () => {
   });
 
   it("test_add_question_open_ended", async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ questions: [] }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            id: "q-new",
-            order_index: 0,
-            question_text: "New question",
-            question_type: "open",
-            probing_depth: 3,
-          }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            questions: [
-              { id: "q-new", order_index: 0, question_text: "New question", question_type: "open", probing_depth: 3 },
-            ],
-          }),
-      });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ questions: [] }),
+    });
     render(<ProjectQuestionsPage />);
     await waitFor(() => {
       expect(screen.getByTestId("add-question")).toBeInTheDocument();
     });
     fireEvent.click(screen.getByTestId("add-question"));
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/questions"),
-        expect.objectContaining({
-          method: "POST",
-          body: expect.stringContaining("New question"),
-        })
-      );
+      expect(screen.getByTestId("question-card-0")).toBeInTheDocument();
     });
+    expect(screen.getByPlaceholderText("Question text (required)")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("test_add_question_rating_shows_scale_fields", async () => {
@@ -138,9 +113,10 @@ describe("Question Editor", () => {
     expect(screen.getByTestId("options-section")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Option A")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Option B")).toBeInTheDocument();
+    expect(screen.getByTestId("option-0-branch-toggle")).toBeInTheDocument();
   });
 
-  it("test_drag_reorder_updates_cards", async () => {
+  it("test_move_up_reorders_cards", async () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
@@ -215,11 +191,7 @@ describe("Question Editor", () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            id: "q1",
-            order_index: 0,
-            question_text: "Edited text",
-            question_type: "open",
-            probing_depth: 2,
+            questions: [{ id: "q1", order_index: 0, question_text: "Edited text", question_type: "open", probing_depth: 2 }],
           }),
       });
     render(<ProjectQuestionsPage />);
@@ -229,11 +201,11 @@ describe("Question Editor", () => {
     fireEvent.change(screen.getByPlaceholderText("Question text (required)"), {
       target: { value: "Edited text" },
     });
-    fireEvent.click(screen.getByText("Save"));
+    fireEvent.click(screen.getByTestId("save-all"));
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/questions/q1"),
-        expect.objectContaining({ method: "PATCH", body: expect.stringContaining("Edited text") })
+        expect.stringContaining("/projects/123/questions"),
+        expect.objectContaining({ method: "PUT", body: expect.stringContaining("Edited text") })
       );
     });
   });
@@ -250,10 +222,14 @@ describe("Question Editor", () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue("Has text")).toBeInTheDocument();
     });
-    fireEvent.change(screen.getByPlaceholderText("Question text (required)"), { target: { value: "" } });
-    fireEvent.click(screen.getByText("Save"));
-    await waitFor(() => {
-      expect(screen.getByText("Question text is required")).toBeInTheDocument();
-    });
+    const textarea = screen.getByPlaceholderText("Question text (required)");
+    fireEvent.change(textarea, { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("save-all"));
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("inline-error")).toHaveTextContent("Question text is required");
+      },
+      { timeout: 2000 }
+    );
   });
 });

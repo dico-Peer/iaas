@@ -150,3 +150,31 @@ def test_probing_depth_range_validation(client, org_admin_token, project_id):
         json={"question_text": "Q2", "question_type": "open", "probing_depth": 11},
     )
     assert r2.status_code in (400, 422)
+
+
+def test_batch_put_questions(client, org_admin_token, project_id):
+    """PUT /questions replaces all questions (AC #7)."""
+    r = client.put(
+        f"/api/v1/projects/{project_id}/questions",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+        json={
+            "questions": [
+                {"order_index": 0, "question_text": "First", "question_type": "open", "probing_depth": 1},
+                {"order_index": 1, "question_text": "Second", "question_type": "scale", "probing_depth": 2, "scale_config": {"min": 1, "max": 5}},
+            ]
+        },
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data["questions"]) == 2
+    assert data["questions"][0]["question_text"] == "First"
+    assert data["questions"][1]["question_text"] == "Second"
+    assert data["questions"][1]["scale_config"]["min"] == 1
+    r2 = client.put(
+        f"/api/v1/projects/{project_id}/questions",
+        headers={"Authorization": f"Bearer {org_admin_token}"},
+        json={"questions": [{"order_index": 0, "question_text": "Only one", "question_type": "open", "probing_depth": 3}]},
+    )
+    assert r2.status_code == 200
+    assert len(r2.json()["questions"]) == 1
+    assert r2.json()["questions"][0]["question_text"] == "Only one"
